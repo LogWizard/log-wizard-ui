@@ -1,5 +1,6 @@
 // Підключаємо необхідні модулі
 import fs from 'fs';
+import fsp from 'fs/promises';
 import cors_proxy from 'cors-anywhere';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -45,10 +46,8 @@ if (paramsKeys.length !== 0) {
     corsServerPort = paramsOnConfig['Cors Server Port'];
 }
 app.use(express.json());
-let folderPath = path.join(MSG_PATH, new Date().toLocaleDateString('uk-UA'), '/');
 async function readConfigPrams() { return configManager.read(); }
 
-console.log(folderPath);
 export function createMessageServer() {
     /* Цей сервер необхідний для обходу CORS */
     cors_proxy.createServer({
@@ -59,18 +58,33 @@ export function createMessageServer() {
         console.log(`Server CORS Anywhere started on port ${corsServerPort}`);
     });
     /* Цей сервер необхідний для обходу CORS */
+    let folderPath = path.join(MSG_PATH, new Date().toLocaleDateString('uk-UA'), '/');
 
     /* Api Settings */
     app.post('/api/v1/getSettings', async (req, res) => {
         const response = await readConfigPrams();
+        await getDirectories(folderPath)
+            .then((directories) => {
+                response.groups = directories;
+                console.log(response);
+            })
+            .catch((error) => console.error(error));
+
         console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} POST`);
+
         res.status(200).send(response);
     });
     app.post('/api/v1/setSettings', async (req, res) => {
         const data = req.body;
+        const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
         console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
-        folderPath = path.join(req.body['Listening Path'], new Date().toLocaleDateString('uk-UA'), '/');
+        folderPath = path.join(req.body['Listening Path'], selectedDate, '/');
+        if (data.group) {
+            if (data.group !== 'allPrivate') {
+                folderPath = path.join(folderPath, data.group, '/');
+            }
+        }
         res.status(200).send({ success: true });
     });
     /* Api Settings */
@@ -80,7 +94,16 @@ export function createMessageServer() {
         try {
             const urlObj = new URL(req.url, `http://${req.headers.host}`);
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
+            const date = urlObj.searchParams.get('date');
+            const group = urlObj.searchParams.get('group');
             console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} GET`);
+            folderPath = path.join(MSG_PATH, date);
+            if (group) {
+                if (group !== 'allPrivate') {
+                    folderPath = path.join(folderPath, group, '/');
+                }
+            }
+            console.log(folderPath);
             fs.accessSync(folderPath, fs.constants.R_OK);
             const messages = [];
             const files = fs.readdirSync(folderPath);
@@ -161,5 +184,44 @@ export function createMessageServer() {
         const configData = configManager.read();
         Object.assign(configData, params);
         configManager.write(configData);
+    }
+    function formatDate(date, time = false, tHour = false) {
+        let d = new Date(date),
+            month = '' + (d.getMonth() + 1),
+            day = '' + d.getDate(),
+            year = d.getFullYear(),
+            hour = '' + d.getHours(),
+            minutes = '' + d.getMinutes(),
+            seconds = '' + d.getSeconds();
+        if (month.length < 2)
+            month = '0' + month;
+
+        if (day.length < 2)
+            day = '0' + day;
+
+        if (hour.length < 2)
+            hour = '0' + hour;
+
+        if (minutes.length < 2)
+            minutes = '0' + minutes;
+
+        if (seconds.length < 2)
+            seconds = '0' + seconds;
+        if (tHour) {
+            return `${[hour, minutes].join(':')}`;
+        }
+        if (time) {
+            return `${[day, month, year].join('.')} ${[hour, minutes, seconds].join(':')}`;
+        } else {
+            return `${[day, month, year].join('.')}`;
+        }
+
+    }
+    async function getDirectories(path) {
+        const entries = await fsp.readdir(path, { withFileTypes: true }); // readdir з параметром з файлами
+
+        const directories = entries.filter((entry) => entry.isDirectory()); // фільтруємо лише папки (directories)
+
+        return directories.map((directory) => directory.name); // повертаємо масив імен папок
     }
 }

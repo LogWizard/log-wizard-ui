@@ -7,9 +7,9 @@ const __dirname = path.dirname(__filename);
 
 // Set default data
 const defaultData = {
-    "Listening Port": 3003,
+    "Listening Port": 3005,
     "Listening Path": path.join(__dirname, '../messages'),
-    "Cors Server Port": 3004
+    "Cors Server Port": 3006
 };
 
 export class ConfigManager {

@@ -373,7 +373,26 @@ summary{
     /* border-radius: 5px; */
     float: right; /* Зміщує кнопку до правої сторони*/
   }
-  
+  #display-settings input,
+  #display-settings select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #server-settings input,
+  server-settings select{
+    width: 100%;
+    box-sizing: border-box;
+  }
+  fieldset {
+    border: 0;
+  }
+  label {
+    display: block;
+    margin: 30px 0 0 0;
+  }
+  .overflow {
+    height: 200px;
+  }
   label,
   input {
       display: block;

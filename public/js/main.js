@@ -1,3 +1,4 @@
+
 const chatMessages = document.getElementById("chat-messages");
 emojione.ascii = true;
 let title = $('#historyDate');
@@ -116,9 +117,17 @@ ${message.aiAnswer ? `<span style="color:#ff8000;"><b>AI Answer:</b><br> ${messa
 // Отримання даних про повідомлення з сервера
 let statusFunc = false;
 let latestMessageId = 0;
+let selectedUserDate = $('#selectDate').val() ? $('#selectDate').val() : new Date();
 async function fetchMessages() {
-    // Запит для отримання тільки нових повідомлень
-    const response = await fetch(`/messages?since=${latestMessageId}`);
+    const serverRespon = await getSettingsFromServer();
+
+    selectedUserDate = serverRespon.Date ? serverRespon.Date : new Date();
+    let dateObj = new Date(selectedUserDate.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1"));
+    let formattedDate = dateObj.toISOString().split('T')[0];
+    console.log(formattedDate); // 2023-03-28
+    // $('#selectDate').val(formattedDate);
+
+    const response = await fetch(`/messages?since=${latestMessageId}&date=${formatDate(selectedUserDate)}&group=${groupAfterSelection}`);
     if (!response.ok) {
         console.error("Не вдалось отримати список повідомлень");
         return;
@@ -138,29 +147,65 @@ async function fetchMessages() {
     Prism.highlightAll('pre.language-json'); //розкрашування json
 }
 /* Для того щоб навіть пізніше додані елементи могли викликати функцію */
+async function getSettingsFromServer() {
+    let response = [];
+    await fetch('/api/v1/getSettings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+        .then(response => response.json())
+        .then(data => {
+            response = data;
+        }).catch(error => console.error(error));
+    return response;
+}
+let groupAfterSelection = '';
 $(document).ready(function () {
-    /* settings button event listening */
+    $(document).on('change', '#groupsSelect', function () {
+        groupAfterSelection = $(this).val();
+        console.log(groupAfterSelection);
+    });
+
     $(document).on('click', '.settings-btn', async function () {
-        await fetch('/api/v1/getSettings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                // Додайте параметри, які слід передати на сервер
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                $('#listeningPort').val(data['Listening Port']);
-                $('#listeningPath').val(data['Listening Path']);
-                $('#corsServerPort').val(data['Cors Server Port']);
-            }).catch(error => console.error(error));
+        const data = await getSettingsFromServer();
+        const groups = data.groups;
+        let options = "";
+        if (groups) {
+            groups.forEach((group) => {
+                options += `<option value="${group}">${group}</option>`;
+            });
+            //<label for="selectGroupChat">Select chat:</label>
+            const selectTemplate = `
+    <select id="groupsSelect" class="js-example-basic-single" name="state">
+    <option value="" >Chuse option</option>
+    <option value="allPrivate" >All Private Message</option>
+      ${options}
+    </select>`;
+
+            $("#groupsSelect").replaceWith(selectTemplate);
+            $('#groupsSelect').select2({
+                width: '100%',
+                style: "display:block;",
+                minimumResultsForSearch: -1
+            });
+            $('#groupsSelectLabel').css({ "display": "block" });
+        }
+
+        //  
+        $('#listeningPort').val(data['Listening Port']);
+        $('#listeningPath').val(data['Listening Path']);
+        $('#corsServerPort').val(data['Cors Server Port']);
+        const dateParts = data['Date'].split('.');
+        const formattedDate = `${dateParts[2]}-${(Number(dateParts[1])).toString().padStart(2, "0")}-${(Number(dateParts[0])).toString().padStart(2, "0")}`;
+        $('#selectDate').val(formattedDate);
         $("#dialog").dialog("open");
     });
     $(function () {
         $("#dialog").dialog({
             autoOpen: false,
+            width: "40%",
             modal: true,
             buttons: {
                 "Save": async function () {
@@ -168,7 +213,9 @@ $(document).ready(function () {
                     const data = {
                         'Listening Port': $('#listeningPort').val(),
                         'Listening Path': $('#listeningPath').val(),
-                        'Cors Server Port': $('#corsServerPort').val()
+                        'Cors Server Port': $('#corsServerPort').val(),
+                        'Date': formatDate($('#selectDate').val()),
+                        'group': groupAfterSelection
                     };
                     await fetch('/api/v1/setSettings', {
                         method: 'POST',
@@ -180,9 +227,13 @@ $(document).ready(function () {
                         $('#listeningPort').val(data['Listening Port']);
                         $('#listeningPath').val(data['Listening Path']);
                         $('#corsServerPort').val(data['Cors Server Port']);
+
                     }).catch(error => console.error(error));
                     $(this).dialog("close");
-                    location.reload();
+                    // location.reload();
+                    $('#chat-messages').empty();
+                    latestMessageId = 0;
+                    await fetchMessages();
                 },
                 Cancel: function () {
                     $(this).dialog("close");
@@ -288,3 +339,20 @@ function injectMusicPlayer(funcStatus) {
 
 fetchMessages();
 setInterval(fetchMessages, 8295);
+
+
+function formatDate(date, time = false, tHour = false) {
+    let d = new Date(date);
+
+    if (isNaN(d)) {
+        return date;
+    }
+
+    if (tHour) {
+        return `${d.toLocaleTimeString('uk-UA', { hour12: false })}`;
+    } else if (time) {
+        return `${d.toLocaleDateString('uk-UA')} ${d.toLocaleTimeString('uk-UA')}`;
+    } else {
+        return `${d.toLocaleDateString('uk-UA')}`;
+    }
+}
