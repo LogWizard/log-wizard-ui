@@ -120,14 +120,8 @@ let latestMessageId = 0;
 let selectedUserDate = $('#selectDate').val() ? $('#selectDate').val() : new Date();
 async function fetchMessages() {
     const serverRespon = await getSettingsFromServer();
-
     selectedUserDate = serverRespon.Date ? serverRespon.Date : new Date();
-    let dateObj = new Date(selectedUserDate.replace(/(\d{2})\.(\d{2})\.(\d{4})/, "$3-$2-$1"));
-    let formattedDate = dateObj.toISOString().split('T')[0];
-    console.log(formattedDate); // 2023-03-28
-    // $('#selectDate').val(formattedDate);
-
-    const response = await fetch(`/messages?since=${latestMessageId}&date=${formatDate(selectedUserDate)}&group=${groupAfterSelection}`);
+    const response = await fetch(`/messages?since=${latestMessageId}&date=${selectedUserDate}&group=${groupAfterSelection}`);
     if (!response.ok) {
         console.error("Не вдалось отримати список повідомлень");
         return;
@@ -217,6 +211,7 @@ $(document).ready(function () {
                         'Date': formatDate($('#selectDate').val()),
                         'group': groupAfterSelection
                     };
+                    console.log(formatDate($('#selectDate').val()));
                     await fetch('/api/v1/setSettings', {
                         method: 'POST',
                         headers: {
@@ -348,11 +343,15 @@ function formatDate(date, time = false, tHour = false) {
         return date;
     }
 
+    const day = d.getDate().toString().padStart(2, '0'); // 01
+    const month = (d.getMonth() + 1).toString().padStart(2, '0'); // 04
+    const year = d.getFullYear(); // 2023
+
     if (tHour) {
         return `${d.toLocaleTimeString('uk-UA', { hour12: false })}`;
     } else if (time) {
-        return `${d.toLocaleDateString('uk-UA')} ${d.toLocaleTimeString('uk-UA')}`;
+        return `${day}.${month}.${year} ${d.toLocaleTimeString('uk-UA')}`;
     } else {
-        return `${d.toLocaleDateString('uk-UA')}`;
+        return `${day}.${month}.${year}`;
     }
 }

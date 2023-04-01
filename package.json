@@ -1,6 +1,6 @@
 {
   "name": "log-wizard-ui",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "UI From view Tg Chat Bots Message and detailed info from Telegram.Message Object.",
   "main": "./index.js",
   "type": "module",

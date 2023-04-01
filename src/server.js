@@ -66,7 +66,7 @@ export function createMessageServer() {
         await getDirectories(folderPath)
             .then((directories) => {
                 response.groups = directories;
-                console.log(response);
+                // console.log(response);
             })
             .catch((error) => console.error(error));
 
@@ -90,7 +90,7 @@ export function createMessageServer() {
     /* Api Settings */
 
     /* Цей роутер відповідає за get запитів /message */
-    app.get('/messages', (req, res) => {
+    app.get('/messages', async (req, res) => {
         try {
             const urlObj = new URL(req.url, `http://${req.headers.host}`);
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
@@ -103,7 +103,7 @@ export function createMessageServer() {
                     folderPath = path.join(folderPath, group, '/');
                 }
             }
-            console.log(folderPath);
+            // console.log(folderPath);
             fs.accessSync(folderPath, fs.constants.R_OK);
             const messages = [];
             const files = fs.readdirSync(folderPath);
@@ -115,7 +115,8 @@ export function createMessageServer() {
                 }
                 try {
                     const data = fs.readFileSync(filePath);
-                    const message = JSON.parse(data);
+                    let message = JSON.parse(data);
+                    message = await urlReplaser(message);
                     if (sinceParam && message.message_id <= sinceParam) {
                         continue;
                     }
@@ -124,6 +125,7 @@ export function createMessageServer() {
                         text: message.text,
                         time: new Date(message.date * 1000),
                     };
+
                     // add additional properties to chatMessage
                     const fields = Object.keys(message).filter(
                         (key) => !['from', 'text', 'date'].includes(key)
@@ -136,7 +138,9 @@ export function createMessageServer() {
                     console.error(`Error parsing/reading file ${filePath}: ${error}`);
                 }
             }
+
             messages.sort((a, b) => b.time - a.time);
+
             res.status(200).json(messages);
         } catch (err) {
             console.error(`Error accessing directory: ${err}`);
@@ -219,9 +223,52 @@ export function createMessageServer() {
     }
     async function getDirectories(path) {
         const entries = await fsp.readdir(path, { withFileTypes: true }); // readdir з параметром з файлами
-
         const directories = entries.filter((entry) => entry.isDirectory()); // фільтруємо лише папки (directories)
-
         return directories.map((directory) => directory.name); // повертаємо масив імен папок
     }
+    async function urlReplaser(obj) {
+        const regex = /"url_.+?"/;
+        const match = JSON.stringify(obj).match(regex);
+        if (match) {
+            const file_id = await findFileId(obj);
+            const urlKey = match[0].replaceAll('"', '');
+            const url = obj[urlKey];
+            const botToken = await getBotTokenFromLink(url);
+            const newUrl = await getFileUrl(botToken, file_id);
+            const newObj = JSON.parse(JSON.stringify(obj).replace(JSON.stringify(obj[urlKey]), `"${newUrl}"`));
+            return newObj;
+        } else {
+            return obj;
+        }
+    }
+    async function getFileUrl(token, fileId) {
+        const response = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+        const json = await response.json();
+        if (json.ok && json.result && json.result.file_path) {
+            const fileUrl = `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
+            return fileUrl;
+        } else {
+            throw new Error('Failed to get file URL');
+        }
+    }
+    async function getBotTokenFromLink(link) {
+        const [firstPart, secondPart] = link.split('/bot');
+        return secondPart.substring(0, secondPart.indexOf('/'));
+    }
+    async function findFileId(obj) {
+        let result = { id: undefined, size: undefined };
+        const recursiveFinding = (obj) => {
+            for (let key in obj) {
+                if (typeof obj[key] === 'object' && Object.getPrototypeOf(obj[key]) === Object.prototype) {
+                    recursiveFinding(obj[key]);
+                } else if (key === 'file_id' && (!result.id || obj.file_size > result.size)) {
+                    result.id = obj.file_id;
+                    result.size = obj.file_size;
+                }
+            }
+        };
+        recursiveFinding(obj);
+        return result.id;
+    }
+
 }
