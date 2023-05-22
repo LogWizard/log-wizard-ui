@@ -39,6 +39,14 @@ function addChatMessage(message) {
     const user = typeof message.user === "string" ? message.user : '';
     const text = typeof message.text === "string" ? message.text : '';
     const time = new Date(message.time).toLocaleString() || '';
+    let musicName = '';
+    if (message.audio) {
+        if (message.audio.performer !== undefined && message.audio.title !== undefined) {
+            musicName = `${message.audio.performer} — ${message.audio.title}`;
+        } else {
+            musicName = message.audio.file_name.replace(/\.mp3|\.ogg/gi, '');
+        }
+    }
     const photo = message.url_photo ? `<img class="photo" src="${message.url_photo}" width="650" height="auto">` : '';
     const sticker = message.url_sticker ? `<img class="sticker" src="${message.url_sticker}" width="196" height="196">` : '';
     const video_note = message.url_video_note ? `<div id="circular-progress-${message.message_id}" class="circular-progress">
@@ -57,7 +65,7 @@ function addChatMessage(message) {
     <audio src="${message.url_voice}"></audio>
   </div>` : '';
     const music = message.url_audio ? `<div id="audio-player">
-  <h2>${message.audio.performer} — ${message.audio.title}</h2>
+  <h2>${musicName}</h2>
   <audio src="${message.url_audio}" id="audio"></audio>
   <div id="controls">
     <button id="play-button">Грати#?</button>
@@ -121,7 +129,8 @@ let selectedUserDate = $('#selectDate').val() ? $('#selectDate').val() : new Dat
 async function fetchMessages() {
     const serverRespon = await getSettingsFromServer();
     selectedUserDate = serverRespon.Date ? serverRespon.Date : new Date();
-    const response = await fetch(`/messages?since=${latestMessageId}&date=${selectedUserDate}&group=${groupAfterSelection}`);
+    groupAfterSelection = serverRespon.group ? serverRespon.group : 'allPrivate';
+    const response = await fetch(`/messages?since=${latestMessageId}&date=${selectedUserDate}&group=${groupAfterSelection ? groupAfterSelection : 'allPrivate'}`);
     if (!response.ok) {
         console.error("Не вдалось отримати список повідомлень");
         return;
@@ -135,7 +144,8 @@ async function fetchMessages() {
         messages.reverse();
         messages.forEach(addChatMessage);
     }
-    title.html(`<button id="settings-btn" class="settings-btn">Settings</button>Last Update: ${new Date().toLocaleString()}`);
+    title.html(`<button id="settings-btn" class="settings-btn">Settings</button><span style="cursor:pointer;" id="dateLabel">Selected: ${selectedUserDate}</span>`);
+    $('#dateLabel').text(`Selected: ${selectedUserDate}`);
     await injectVoicePlayer(statusFunc);
     injectMusicPlayer(statusFunc);
     Prism.highlightAll('pre.language-json'); //розкрашування json
@@ -155,16 +165,52 @@ async function getSettingsFromServer() {
         }).catch(error => console.error(error));
     return response;
 }
+async function setSettingsFromServer(data) {
+    await fetch('/api/v1/setSettings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    }).then(response => response.json()).then(data => {
+        $('#listeningPort').val(data['Listening Port']);
+        $('#listeningPath').val(data['Listening Path']);
+        $('#corsServerPort').val(data['Cors Server Port']);
+    }).catch(error => console.error(error));
+}
+
 let groupAfterSelection = '';
 $(document).ready(function () {
     $(document).on('change', '#groupsSelect', function () {
         groupAfterSelection = $(this).val();
-        console.log(groupAfterSelection);
+    });
+
+    $('#selectDateWidget').datepicker({
+        dateFormat: 'dd.mm.yy',
+        onSelect: function (dateText) {
+            selectedUserDate = dateText;
+            const data = {
+                'Date': dateText
+            };
+            setSettingsFromServer(data);
+            $('#chat-messages').empty();
+            latestMessageId = 0;
+            fetchMessages();
+        }
+    });
+    $(document).on('click', '#dateLabel', function () {
+        if ($('#selectDateWidget').is(':visible')) {
+            $('#selectDateWidget').datepicker('hide');
+        } else {
+            console.log('Клік на #dateLabel');
+            $('#selectDateWidget').datepicker('show');
+        }
     });
 
     $(document).on('click', '.settings-btn', async function () {
         const data = await getSettingsFromServer();
         const groups = data.groups;
+        $('#dialog').css("display", "block");
         let options = "";
         if (groups) {
             groups.forEach((group) => {
@@ -211,19 +257,7 @@ $(document).ready(function () {
                         'Date': formatDate($('#selectDate').val()),
                         'group': groupAfterSelection
                     };
-                    console.log(formatDate($('#selectDate').val()));
-                    await fetch('/api/v1/setSettings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    }).then(response => response.json()).then(data => {
-                        $('#listeningPort').val(data['Listening Port']);
-                        $('#listeningPath').val(data['Listening Path']);
-                        $('#corsServerPort').val(data['Cors Server Port']);
-
-                    }).catch(error => console.error(error));
+                    await setSettingsFromServer(data);
                     $(this).dialog("close");
                     // location.reload();
                     $('#chat-messages').empty();
@@ -291,49 +325,58 @@ function startProgressBar(video_noteId) {
 
 
 
-/* Music Це треба фіксить багато ще*/
+/* Music */
 function injectMusicPlayer(funcStatus) {
-
-    if (!funcStatus) {
-
-        const audioPlayers = document.querySelectorAll('#audio-player');
-        const playButtons = document.querySelectorAll('#play-button');
-
-        audioPlayers.forEach((audioPlayer, index) => {
-            const playButton = playButtons[index];
-            const audio = audioPlayer.querySelector('audio');
-
-            // Слухач на кнопку грати/пауза.
-            playButton.addEventListener('click', (event) => {
-                if (audio.paused || audio.ended) {
-                    audio.play();
-                    playButton.innerText = "Не Грати#?";
-                } else {
-                    audio.pause();
-                    playButton.innerText = "Грати#?";
-                }
-            });
-
-            // Слухач на подію timeupdate аудіо.
-            audio.addEventListener('timeupdate', () => {
-                const duration = audio.duration;
-                const currentTimeValue = audio.currentTime;
-                const progress = (currentTimeValue / duration) * 100;
-                const timeline = audioPlayer.getElementsByTagName("div")[0].getElementsByTagName("div")[0];
-                const currentTime = audioPlayer.getElementsByTagName("div")[1];
-
-                // timeline.style.width = `${progress}%`;
-                currentTime.innerText = `${currentTimeValue.toFixed(2)}s / ${duration.toFixed(2)}s`;
-            });
-        });
-
+    if (funcStatus) {
+        return;
     }
 
+    const audioPlayers = document.querySelectorAll("#audio-player");
+    const playButtons = document.querySelectorAll("#play-button");
+
+    for (let i = 0; i < audioPlayers.length; i++) {
+        const audioPlayer = audioPlayers[i];
+        const playButton = playButtons[i];
+        const audio = audioPlayer.querySelector("audio");
+        const timeline = audioPlayer.querySelector(
+            "#timeline > .progress-bar"
+        );
+        const currentTimeEl = audioPlayer.querySelector("#current-time");
+
+        playButton.addEventListener("click", () => {
+            if (audio.paused || audio.ended) {
+                audio.play();
+                playButton.textContent = "Не Грати#?";
+            } else {
+                audio.pause();
+                playButton.textContent = "Грати#?";
+            }
+        });
+
+        audio.addEventListener("timeupdate", () => {
+            const duration = audio.duration;
+            const currentTimeValue = audio.currentTime;
+            const progress = (currentTimeValue / duration) * 100;
+
+            timeline.style.width = `${progress}%`;
+            currentTimeEl.textContent = `${formatTime(
+                currentTimeValue
+            )} / ${formatTime(duration)}`;
+        });
+    }
 }
+
+function formatTime(seconds) {
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60).toFixed(0).padStart(2, "0");
+    return `${min}:${sec}`;
+}
+
 /* Music */
 
 fetchMessages();
 setInterval(fetchMessages, 8295);
+
 
 
 function formatDate(date, time = false, tHour = false) {

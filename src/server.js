@@ -65,24 +65,29 @@ export function createMessageServer() {
         const response = await readConfigPrams();
         await getDirectories(folderPath)
             .then((directories) => {
-                response.groups = directories;
-                // console.log(response);
+                if (directories) {
+                    response.groups = directories;
+                }
             })
-            .catch((error) => console.error(error));
+            .catch((error) => console.error('getSettingsApi: ' + error));
 
-        console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} POST`);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} POST`);
 
         res.status(200).send(response);
     });
     app.post('/api/v1/setSettings', async (req, res) => {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
-        console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
-        folderPath = path.join(req.body['Listening Path'], selectedDate, '/');
+        if (data['Listening Path']) {
+            folderPath = path.join(data['Listening Path'], selectedDate);
+        }
+
         if (data.group) {
             if (data.group !== 'allPrivate') {
-                folderPath = path.join(folderPath, data.group, '/');
+                folderPath = path.join(folderPath, data.group);
             }
         }
         res.status(200).send({ success: true });
@@ -96,11 +101,12 @@ export function createMessageServer() {
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
             const date = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
-            console.log(`Received ${req.headers['sec-ch-ua-platform']} request for http://${req.headers.host}${req.url} GET`);
+            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} GET`);
             folderPath = path.join(MSG_PATH, date);
             if (group) {
                 if (group !== 'allPrivate') {
-                    folderPath = path.join(folderPath, group, '/');
+                    folderPath = path.join(folderPath, group
+                    );
                 }
             }
             // console.log(folderPath);
@@ -222,9 +228,11 @@ export function createMessageServer() {
 
     }
     async function getDirectories(path) {
-        const entries = await fsp.readdir(path, { withFileTypes: true }); // readdir з параметром з файлами
-        const directories = entries.filter((entry) => entry.isDirectory()); // фільтруємо лише папки (directories)
-        return directories.map((directory) => directory.name); // повертаємо масив імен папок
+        if (fs.existsSync(path)) {
+            const entries = await fsp.readdir(path, { withFileTypes: true });
+            const directories = entries.filter((entry) => entry.isDirectory());
+            return directories.map((directory) => directory.name);
+        }
     }
     async function urlReplaser(obj) {
         const regex = /"url_.+?"/;
@@ -252,18 +260,28 @@ export function createMessageServer() {
         }
     }
     async function getBotTokenFromLink(link) {
-        const [firstPart, secondPart] = link.split('/bot');
-        return secondPart.substring(0, secondPart.indexOf('/'));
+        if (link) {
+            const [firstPart, secondPart] = link.split('/bot');
+            return secondPart.substring(0, secondPart.indexOf('/'));
+        }
     }
     async function findFileId(obj) {
-        let result = { id: undefined, size: undefined };
+        let result = { id: undefined, size: 0 };
         const recursiveFinding = (obj) => {
-            for (let key in obj) {
-                if (typeof obj[key] === 'object' && Object.getPrototypeOf(obj[key]) === Object.prototype) {
-                    recursiveFinding(obj[key]);
-                } else if (key === 'file_id' && (!result.id || obj.file_size > result.size)) {
-                    result.id = obj.file_id;
-                    result.size = obj.file_size;
+            if (typeof obj === "object" && obj != null) {
+                if (Object.prototype.hasOwnProperty.call(obj, "file_id") && typeof obj["file_id"] !== "undefined") {
+                    if (Object.prototype.hasOwnProperty.call(obj, "file_size")) {
+                        if (obj.file_size > result.size) {
+                            result.id = obj.file_id;
+                            result.size = obj.file_size;
+                        }
+                    } else {
+                        result.id = obj.file_id;
+                    }
+                } else {
+                    for (let key in obj) {
+                        recursiveFinding(obj[key]);
+                    }
                 }
             }
         };
@@ -271,4 +289,21 @@ export function createMessageServer() {
         return result.id;
     }
 
+
+    function getOSFromUA(userAgent) {
+        if (/Windows/.test(userAgent)) {
+            return 'Windows';
+        }
+
+        if (/Mac OS/.test(userAgent)) {
+            return 'macOS';
+        }
+
+        if (/Linux/.test(userAgent)) {
+            return 'Linux';
+        }
+
+        // if no match
+        return null;
+    }
 }

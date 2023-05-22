@@ -154,7 +154,7 @@ h1 img {
 
 .shoutbox-comment-reply {
     display: inline-block;
-    float: left;
+    /* float: left; */
     color: #5896cb;
     font-size: 12px;
     font-weight: bold;
@@ -392,6 +392,9 @@ summary{
   }
   .overflow {
     height: 200px;
+  }
+  .hidden {
+    display: none;
   }
   label,
   input {

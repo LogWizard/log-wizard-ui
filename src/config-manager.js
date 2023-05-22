@@ -9,7 +9,9 @@ const __dirname = path.dirname(__filename);
 const defaultData = {
     "Listening Port": 3005,
     "Listening Path": path.join(__dirname, '../messages'),
-    "Cors Server Port": 3006
+    "Cors Server Port": 3006,
+    "Date": "01.04.2023",
+    "group": "allPrivate"
 };
 
 export class ConfigManager {
@@ -45,7 +47,11 @@ export class ConfigManager {
         if (typeof data !== 'object' || Array.isArray(data)) {
             throw new Error('Invalid Data Type');
         }
-        const jsonData = JSON.stringify(data, null, 2);
+
+        const configData = this.read();
+        const updatedConfig = Object.assign({}, configData, data);
+
+        const jsonData = JSON.stringify(updatedConfig, null, 2);
         fs.writeFileSync(this.filename, jsonData);
     }
 }
