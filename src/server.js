@@ -79,7 +79,7 @@ export function createMessageServer() {
             })
             .catch((error) => console.error('getSettingsApi: ' + error));
 
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} POST`);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} POST`);
 
         res.status(200).send(response);
     });
@@ -87,7 +87,7 @@ export function createMessageServer() {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
 
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
         if (data['Listening Path']) {
             folderPath = path.join(data['Listening Path'], selectedDate);
@@ -109,7 +109,7 @@ export function createMessageServer() {
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
             const date = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
-            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for http://${req.headers.host}${req.url} GET`);
+            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} GET`);
             folderPath = path.join(MSG_PATH, date);
             if (group) {
                 if (group !== 'allPrivate') {
