@@ -228,7 +228,8 @@ $(document).ready(function () {
             $('#groupsSelect').select2({
                 width: '100%',
                 style: "display:block;",
-                minimumResultsForSearch: -1
+                minimumResultsForSearch: -1,
+                theme: 'grey'
             });
             $('#groupsSelectLabel').css({ "display": "block" });
         }
@@ -247,6 +248,7 @@ $(document).ready(function () {
             autoOpen: false,
             width: "40%",
             modal: true,
+            closeText: "X",
             buttons: {
                 "Save": async function () {
                     // Send values to server

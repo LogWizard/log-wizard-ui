@@ -1,6 +1,7 @@
 // Підключаємо необхідні модулі
 import fs from 'fs';
 import fsp from 'fs/promises';
+import https from 'https';
 import cors_proxy from 'cors-anywhere';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -10,7 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appDirectory = path.resolve(__dirname, '..');
 const configManager = new ConfigManager(path.join(appDirectory, 'config.json'));
+
+const options = {
+    key: fs.readFileSync('src/privatekey.pem'),
+    cert: fs.readFileSync('src/certificate.pem')
+};
+
 const app = express();
+const server = https.createServer(options, app);
 
 const fileTypes = {
     '.html': 'text/html',
@@ -187,7 +195,7 @@ export function createMessageServer() {
         });
     });
     /* Цей роутер відповідає за обробку всіх інших запитів */
-    app.listen(port, () => {
+    server.listen(port, () => {
         console.log(`Express server started on port ${port}`);
     });
     async function writeConfigPrams(params) {
