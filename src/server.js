@@ -35,6 +35,7 @@ const fileTypes = {
 let MSG_PATH = "";
 let port = "";
 let corsServerPort = "";
+let logStr = "http";
 const args = process.argv.slice(2);
 const params = {};
 for (const arg of args) {
@@ -79,7 +80,7 @@ export function createMessageServer() {
             })
             .catch((error) => console.error('getSettingsApi: ' + error));
 
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} POST`);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} POST`);
 
         res.status(200).send(response);
     });
@@ -87,7 +88,7 @@ export function createMessageServer() {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
 
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
         if (data['Listening Path']) {
             folderPath = path.join(data['Listening Path'], selectedDate);
@@ -109,7 +110,7 @@ export function createMessageServer() {
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
             const date = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
-            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for https://${req.headers.host}${req.url} GET`);
+            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} GET`);
             folderPath = path.join(MSG_PATH, date);
             if (group) {
                 if (group !== 'allPrivate') {
@@ -195,9 +196,21 @@ export function createMessageServer() {
         });
     });
     /* Цей роутер відповідає за обробку всіх інших запитів */
+
+    /* from use https server */
     server.listen(port, () => {
+        logStr = 'https://';
         console.log(`Express server started on port ${port}`);
     });
+    /* from use https server */
+
+    /* from use http server */
+    // app.listen(port, () => {
+    //     logStr = 'http://';
+    //     console.log(`Express server started on port ${port}`);
+    // });
+    /* from use http server */
+
     async function writeConfigPrams(params) {
         const configData = configManager.read();
         Object.assign(configData, params);
