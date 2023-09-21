@@ -56,7 +56,16 @@ if (paramsKeys.length !== 0) {
 }
 app.use(express.json());
 async function readConfigPrams() { return configManager.read(); }
+const getIPv4FromIPV6 = (ipAddress) => {
+    const ipv6Pattern = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+    const match = ipAddress.match(ipv6Pattern);
 
+    if (match) {
+        return match[1]; // Повертаємо частину адреси після "::ffff:"
+    }
+
+    return ipAddress; // Якщо адреса не відповідає формату, повертаємо її без змін
+};
 export function createMessageServer() {
     /* Цей сервер необхідний для обходу CORS */
     cors_proxy.createServer({
@@ -87,8 +96,8 @@ export function createMessageServer() {
     app.post('/api/v1/setSettings', async (req, res) => {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
-
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+        const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
+        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
         if (data['Listening Path']) {
             folderPath = path.join(data['Listening Path'], selectedDate);
@@ -110,7 +119,9 @@ export function createMessageServer() {
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
             const date = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
-            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} GET`);
+            const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
+            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} GET`);
+            // console.log(req.socket.remoteAddress);
             folderPath = path.join(MSG_PATH, date);
             if (group) {
                 if (group !== 'allPrivate') {
@@ -136,7 +147,7 @@ export function createMessageServer() {
                         continue;
                     }
                     const chatMessage = {
-                        user: message.from.first_name,
+                        user: message.from?.first_name,
                         text: message.text,
                         time: new Date(message.date * 1000),
                     };
