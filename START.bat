@@ -1,1 +1,1 @@
-start cmd /k cmd /c npm start
+start cmd /k cmd /c npm run dev
