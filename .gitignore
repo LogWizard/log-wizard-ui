@@ -106,3 +106,5 @@ package-lock.json
 config.json
 src/certificate.pem
 src/privatekey.pem
+log-wizard-ui.lnk
+START.bat
