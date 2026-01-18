@@ -109,7 +109,8 @@ function updateChatListItem(div, chat) {
     if (previewEl && previewEl.textContent !== previewText) previewEl.textContent = previewText;
 
     // 🌿 Update Avatar from Cache if available
-    const userId = !chat.id.startsWith('-') ? chat.id : null;
+    const chatIdStr = String(chat.id);
+    const userId = !chatIdStr.startsWith('-') ? chat.id : null;
     if (userId && window.userAvatarCache?.has(userId)) {
         const avatarContainer = div.querySelector('.chat-item-avatar');
         // Check if we already have an image
@@ -148,7 +149,8 @@ function createChatListItem(chat) {
     div.innerHTML = `
         <div class="chat-item-avatar">
             ${(() => {
-            const userId = !chat.id.startsWith('-') ? chat.id : null;
+            const chatIdStr = String(chat.id);
+            const userId = !chatIdStr.startsWith('-') ? chat.id : null;
             if (userId && window.userAvatarCache?.has(userId)) {
                 return `<img src="${window.userAvatarCache.get(userId)}" class="chat-list-avatar" data-user-id="${userId}" alt="${chat.name}" loading="lazy">`;
             }
