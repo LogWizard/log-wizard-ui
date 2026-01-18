@@ -203,21 +203,52 @@ function initMessageInput() {
 }
 
 /**
- * Handle send message
+ * Handle send message - підтримка Quill WYSIWYG 🌿
  */
 async function handleSendMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const text = messageInput.value.trim();
+    // Support both Quill and legacy input
+    let text = '';
+    let htmlText = '';
+
+    if (window.quill) {
+        htmlText = window.quill.root.innerHTML;
+        text = window.quill.getText().trim();
+    } else {
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            text = messageInput.value.trim();
+            htmlText = text;
+        }
+    }
 
     if (!text) return;
 
-    // Get current chat ID (нужен state.selectedChatId)
+    // Get current chat ID
     const selectedChatId = window.selectedChatId;
 
     if (!selectedChatId) {
         alert('Оберіть чат спочатку!');
         return;
     }
+
+    // Convert Quill HTML to Telegram HTML
+    let telegramHtml = htmlText
+        .replace(/<p>/g, '')
+        .replace(/<\/p>/g, '\n')
+        .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
+        .replace(/<em>/g, '<i>').replace(/<\/em>/g, '</i>')
+        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>')
+        .replace(/<span class="tg-spoiler">/g, '<tg-spoiler>').replace(/<\/span>/g, '</tg-spoiler>')
+        .replace(/<pre class="ql-syntax"[^>]*>/g, '<pre>').replace(/<\/pre>/g, '</pre>')
+        .replace(/<blockquote>/g, '❝ ').replace(/<\/blockquote>/g, '\n')
+        .replace(/<br>/g, '\n')
+        .trim();
+
+    // Clean up empty tags
+    telegramHtml = telegramHtml.replace(/<[^/>]+><\/[^>]+>/g, '').trim();
+
+    // Use plain text if no HTML formatting
+    const finalText = telegramHtml.includes('<') ? telegramHtml : text;
 
     try {
         // 🌿 Optimistic UI Update
@@ -226,7 +257,7 @@ async function handleSendMessage() {
             from: { id: 'bot', first_name: 'Gys Bot 🦆', is_bot: true },
             chat: { id: selectedChatId },
             time: new Date().toISOString(),
-            text: text,
+            text: finalText,
             manual: true
         };
 
@@ -237,27 +268,30 @@ async function handleSendMessage() {
             if (window.chatGroups[selectedChatId]) {
                 window.chatGroups[selectedChatId].messages.push(tempMsg);
                 window.chatGroups[selectedChatId].lastMessage = tempMsg;
-                // Re-render chat
                 window.renderChatMessages(selectedChatId);
 
-                // Re-render list (to update sorting/last message)
                 if (typeof window.renderChatListView === 'function') {
                     window.renderChatListView();
                 }
 
-                // Scroll to bottom
                 const container = document.getElementById('messages-container');
                 if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
             }
         }
 
-        await sendTextMessage(selectedChatId, text);
-        messageInput.value = '';
+        await sendTextMessage(selectedChatId, finalText);
+
+        // Clear editor
+        if (window.quill) {
+            window.quill.setText('');
+        } else {
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) messageInput.value = '';
+        }
 
         console.log('📤 Message sent successfully');
     } catch (error) {
         alert('Помилка відправки: ' + error.message);
-        // Remove temp message? Too complex for now.
     }
 }
 

@@ -9,12 +9,15 @@
     <link rel="stylesheet" href="/css/modules/message-input.css">
     <link rel="stylesheet" href="/css/modules/manual-mode.css">
     <link rel="stylesheet" href="/css/modules/mobile.css">
+    <link rel="stylesheet" href="/css/modules/quill-editor.css">
     <link rel="stylesheet" href="/css/emojione.min.css">
     <link rel="stylesheet" href="/css/prism-dark.css">
     <link rel="stylesheet" href="/css/jquery-ui-dark.css">
     <link href="/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.css">
     <link rel="stylesheet" href="/css/vanilla-calendar-theme.css">
+    <!-- Quill WYSIWYG Editor 🌿 -->
+    <link href="https://cdn.quilljs.com/1.3.7/quill.bubble.css" rel="stylesheet">
 
     <script src="/js/jquery-3.5.1.min.js"></script>
     <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
@@ -23,6 +26,8 @@
     <script src="/js/tgs-player.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Quill WYSIWYG Editor 🌿 -->
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 
     <title>Gys Bot Debug 🦆</title>
 
@@ -181,17 +186,7 @@
                 </svg>
             </button>
 
-            <!-- Formatting Toolbar 🌿 -->
-            <div class="formatting-toolbar">
-                <button onclick="insertFormatting('bold')" title="Bold"><b>B</b></button>
-                <button onclick="insertFormatting('italic')" title="Italic"><i>I</i></button>
-                <button onclick="insertFormatting('code')" title="Code">&lt;/&gt;</button>
-                <button onclick="insertFormatting('pre')" title="Pre">Pre</button>
-                <button onclick="insertFormatting('link')" title="Link">🔗</button>
-                <button onclick="insertFormatting('spoiler')" title="Spoiler">👁️</button>
-            </div>
-
-            <!-- Message Input 🌿 -->
+            <!-- Message Input with Quill WYSIWYG 🌿 -->
             <div class="message-input-wrapper">
                 <button id="attachBtn" class="attach-btn" title="Прикріпити файл">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -200,13 +195,25 @@
                         </path>
                     </svg>
                 </button>
-                <input type="text" id="messageInput" class="message-input" placeholder="Написати повідомлення..." />
+                <!-- Quill Editor Container -->
+                <div id="quillEditor" class="message-input-quill"></div>
                 <button id="sendBtn" class="send-btn" title="Відправити (Enter)">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
                 </button>
+            </div>
+            <!-- Quill Formatting Toolbar -->
+            <div id="quillToolbar" class="formatting-toolbar quill-toolbar">
+                <button class="ql-bold" title="Bold"><b>B</b></button>
+                <button class="ql-italic" title="Italic"><i>I</i></button>
+                <button class="ql-strike" title="Strikethrough"><s>S</s></button>
+                <button class="ql-code" title="Code">&lt;/&gt;</button>
+                <button class="ql-code-block" title="Code Block">Pre</button>
+                <button class="ql-blockquote" title="Quote">❝</button>
+                <button class="ql-link" title="Link">🔗</button>
+                <button class="ql-spoiler" title="Spoiler">👁️</button>
             </div>
         </div>
     </div>
@@ -218,6 +225,7 @@
     <script type="module" src="/js/main.js"></script>
     <script src="/js/audio-player.js"></script>
     <script src="/js/prism.js"></script>
+    <script src="/js/quill-init.js"></script>
 </body>
 
 </html>
