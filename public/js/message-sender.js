@@ -493,33 +493,60 @@ function initStickerPicker() {
 
         stickers.forEach(sticker => {
             const item = document.createElement('div');
-            item.style.cssText = 'height: 64px; width: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;';
+            item.style.cssText = 'height: 64px; width: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; position: relative;';
             item.onmouseover = () => item.style.transform = 'scale(1.1)';
             item.onmouseout = () => item.style.transform = 'scale(1)';
 
-            const img = document.createElement('img');
-            img.src = `/api/sticker-image/${sticker.file_id}`;
-            img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
-            img.loading = 'lazy';
+            // Determine preview file_id (use thumbnail for animated/video stickers)
+            const thumbId = sticker.thumbnail?.file_id || sticker.thumb?.file_id;
+            const previewFileId = thumbId || sticker.file_id;
+
+            let mediaEl;
+            if (sticker.is_video && !thumbId) {
+                // Video sticker without thumbnail - render as video
+                mediaEl = document.createElement('video');
+                mediaEl.autoplay = true;
+                mediaEl.loop = true;
+                mediaEl.muted = true;
+                mediaEl.playsInline = true;
+            } else {
+                // Static or has thumbnail - render as img
+                mediaEl = document.createElement('img');
+                mediaEl.loading = 'lazy';
+            }
+
+            mediaEl.src = `/api/sticker-image/${previewFileId}`;
+            mediaEl.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+
+            // Badge for animated/video 🌿
+            if (sticker.is_animated || sticker.is_video) {
+                const badge = document.createElement('span');
+                badge.innerText = '▶';
+                badge.style.cssText = 'position: absolute; bottom: 2px; right: 2px; font-size: 8px; color: white; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px;';
+                item.appendChild(badge);
+            }
 
             item.onclick = async () => {
-                // Send Sticker
-                try {
-                    // Visual feedback
-                    item.style.opacity = '0.5';
-                    await sendSticker(null, sticker.file_id);
-                    item.style.opacity = '1';
-                    panel.style.display = 'none'; // Close on send
+                // Get current chat ID 🌿
+                const chatId = window.selectedChatId;
+                if (!chatId) {
+                    alert('Оберіть чат спочатку!');
+                    return;
+                }
 
-                    // Add message to UI immediately? (handled by event or reload)
-                    alert(`Sticker sent!`);
+                try {
+                    item.style.opacity = '0.5';
+                    await sendSticker(chatId, sticker.file_id);
+                    item.style.opacity = '1';
+                    panel.style.display = 'none';
                 } catch (e) {
-                    alert('Error sending sticker');
+                    console.error('Sticker send error:', e);
+                    alert('Помилка відправки стікера');
                     item.style.opacity = '1';
                 }
             };
 
-            item.appendChild(img);
+            item.appendChild(mediaEl);
             container.appendChild(item);
         });
     }
