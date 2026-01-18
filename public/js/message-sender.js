@@ -303,6 +303,32 @@ function initMessageInput() {
 
     // Init Recording 🌿
     initRecordingHandlers();
+
+    // Init Stickers 🌿
+    initStickerPicker();
+}
+
+/**
+ * Initialize Sticker Picker 🌿
+ */
+function initStickerPicker() {
+    const btn = document.getElementById('stickersBtn');
+    const panel = document.getElementById('stickerPicker');
+
+    if (!btn || !panel) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = panel.style.display === 'flex';
+        panel.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (panel.style.display === 'flex' && !panel.contains(e.target) && !btn.contains(e.target)) {
+            panel.style.display = 'none';
+        }
+    });
 }
 
 /**
