@@ -357,7 +357,7 @@ export async function sendVideoNote(req, res) {
  * POST /api/send-voice-note 🌿
  */
 export async function sendVoiceNote(req, res) {
-    const { chat_id, voice_note } = req.body; // voice_note should be URL to upload
+    const { chat_id, voice_note, caption } = req.body; // voice_note should be URL to upload
 
     if (!chat_id || !voice_note) {
         return res.status(400).json({ error: 'chat_id and voice_note are required' });
@@ -383,6 +383,7 @@ export async function sendVoiceNote(req, res) {
         const form = new FormData();
         form.append('chat_id', chat_id);
         form.append('voice', fs.createReadStream(localOutputPath));
+        if (caption) form.append('caption', caption); // 🌿 Caption support
 
         const response = await fetch(`${TELEGRAM_API}/sendVoice`, {
             method: 'POST',

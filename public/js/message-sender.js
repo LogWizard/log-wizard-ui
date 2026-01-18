@@ -183,14 +183,15 @@ async function sendVideoNote(chatId, videoNoteUrl) {
 /**
  * Send voice note (converted audio) 🌿
  */
-async function sendVoiceNote(chatId, voiceNoteUrl) {
+async function sendVoiceNote(chatId, voiceNoteUrl, caption = '') {
     try {
         const response = await fetch('/api/send-voice-note', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
-                voice_note: voiceNoteUrl
+                voice_note: voiceNoteUrl,
+                caption: caption
             })
         });
 
@@ -856,8 +857,8 @@ async function handleSendMessage() {
                 const isAudio = attachmentToSend.recordingType === 'audio' || attachmentToSend.type.includes('audio');
 
                 if (isAudio) {
-                    // Send as Voice Message
-                    response = await sendVoiceNote(selectedChatId, attachmentToSend.url || attachmentToSend.file);
+                    // Send as Voice Message with caption 🌿
+                    response = await sendVoiceNote(selectedChatId, attachmentToSend.url || attachmentToSend.file, finalText);
                 } else {
                     // Send as Video Note (Circle)
                     response = await sendVideoNote(selectedChatId, attachmentToSend.url || attachmentToSend.file);
