@@ -262,21 +262,43 @@ async function handleSendMessage() {
         return;
     }
 
-    // Convert Quill HTML to Telegram HTML
-    let telegramHtml = htmlText
+    // Convert Quill HTML to Telegram HTML using DOM 🌿
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlText;
+
+    // 1. Handle Spoilers
+    tempDiv.querySelectorAll('.tg-spoiler').forEach(el => {
+        const spoiler = document.createElement('tg-spoiler');
+        spoiler.innerHTML = el.innerHTML;
+        el.replaceWith(spoiler);
+    });
+
+    // 2. Handle Highlights (Map to Bold or Code?) -> Let's map to BOLD 🖍️
+    tempDiv.querySelectorAll('.tg-highlight').forEach(el => {
+        const b = document.createElement('b');
+        b.innerHTML = '🖍️ ' + el.innerHTML; // Add emoji to show it was marked
+        el.replaceWith(b);
+    });
+
+    // 3. Handle Paragraphs (Quill uses <p>)
+    // Replace <p>Foo</p> with Foo<br>
+    // But be careful with last paragraph.
+    // Easier: Just get innerHTML and do minimal regex cleanup for block tags.
+    // Actually Quill <p> wrap lines.
+
+    let telegramHtml = tempDiv.innerHTML
         .replace(/<p>/g, '')
         .replace(/<\/p>/g, '\n')
         .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
         .replace(/<em>/g, '<i>').replace(/<\/em>/g, '</i>')
         .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>')
-        .replace(/<span class="tg-spoiler">/g, '<tg-spoiler>').replace(/<\/span>/g, '</tg-spoiler>')
         .replace(/<pre class="ql-syntax"[^>]*>/g, '<pre>').replace(/<\/pre>/g, '</pre>')
         .replace(/<blockquote>/g, '❝ ').replace(/<\/blockquote>/g, '\n')
         .replace(/<br>/g, '\n')
         .trim();
 
-    // Clean up empty tags
-    telegramHtml = telegramHtml.replace(/<[^/>]+><\/[^>]+>/g, '').trim();
+    // Clean up empty tags and excessive newlines
+    telegramHtml = telegramHtml.replace(/\n\n+/g, '\n\n').trim();
 
     // Use plain text if no HTML formatting
     const finalText = telegramHtml.includes('<') ? telegramHtml : text;
