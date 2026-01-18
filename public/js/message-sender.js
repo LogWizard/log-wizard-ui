@@ -999,61 +999,98 @@ function handleAttachFile() {
  */
 function initDragAndDrop() {
     const messagesPanel = document.querySelector('.messages-panel');
-    if (!messagesPanel) return;
 
-    let overlay = document.createElement('div');
-    overlay.className = 'drag-drop-overlay';
-    overlay.innerHTML = `
-        <div class="drag-drop-content">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-        </div>
-    `;
-    document.body.appendChild(overlay);
+    let overlay = document.querySelector('.drag-drop-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'drag-drop-overlay';
+        overlay.innerHTML = `
+            <div class="drag-drop-content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Safety: Click to close
+        overlay.addEventListener('click', () => overlay.classList.remove('active'));
+    }
 
     // Explicitly export to window for external access 🌿
     window.handleSendMessage = handleSendMessage;
     window.handleAttachFile = handleAttachFile;
     window.updateAttachmentPreview = updateAttachmentPreview;
 
-    messagesPanel.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        overlay.classList.add('active');
+    let dragCounter = 0;
+
+    // Document-wide drag handlers for reliability
+    document.body.addEventListener('dragenter', (e) => {
+        // Only trigger if we are dragging files
+        if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+            dragCounter++;
+            overlay.classList.add('active');
+        }
     });
 
-    messagesPanel.addEventListener('dragleave', (e) => {
-        if (e.target === messagesPanel) {
+    document.body.addEventListener('dragleave', (e) => {
+        dragCounter--;
+        if (dragCounter <= 0) {
+            dragCounter = 0;
             overlay.classList.remove('active');
         }
     });
 
-    messagesPanel.addEventListener('drop', async (e) => {
+    document.body.addEventListener('dragover', (e) => {
+        e.preventDefault(); // Essential for drop to work
+        if (dragCounter === 0) {
+            // Recover if counter got messed up (e.g. initial drag started outside)
+            overlay.classList.add('active');
+            dragCounter = 1;
+        }
+    });
+
+    document.body.addEventListener('drop', async (e) => {
         e.preventDefault();
+        dragCounter = 0;
         overlay.classList.remove('active');
 
         const files = e.dataTransfer.files;
-        if (files.length === 0) return;
+        if (!files || files.length === 0) return;
 
         const file = files[0];
 
         try {
-            const url = await uploadFile(file);
+            // Check if chat is selected
             const selectedChatId = window.selectedChatId;
-
             if (!selectedChatId) {
-                alert('Оберіть чат!');
+                alert('Оберіть чат спочатку!');
                 return;
             }
 
+            const url = await uploadFile(file);
+
             // Use pending attachment flow for consistency
-            pendingAttachment = {
+            // (Assuming 'pendingAttachment' global exists in this scope or window)
+            // But we should use 'window.pendingAttachment' if defined elsewhere or declare it.
+            // Since original code used implicit global, we stick to it, but be careful.
+
+            // We need to define pendingAttachment if not present (it's likely global in main.js or here)
+            // Actually it is defined at top of this file usually.
+
+            // Assign to global variable
+            window.pendingAttachment = { // Making it explicit window property just in case
                 url: url,
                 type: file.type,
                 file: file
             };
+            // Also update local reference if any
+            if (typeof pendingAttachment !== 'undefined') {
+                pendingAttachment = window.pendingAttachment;
+            }
+
             updateAttachmentPreview();
 
             console.log('✅ Dropped file ready to send');
