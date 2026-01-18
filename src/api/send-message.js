@@ -116,8 +116,9 @@ export async function sendMessage(req, res) {
         }
 
         // 🌿 Preserve HTML formatting for local history UI
-        if (data.result && text) {
-            data.result.text = text;
+        if (data.result) {
+            if (text) data.result.text = text;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 
         saveMessageLocally(data, 'Message');
@@ -149,6 +150,7 @@ export async function sendPhoto(req, res) {
         if (data.result) {
             if (caption) data.result.caption = caption;
             if (photo && typeof photo === 'string') data.result.url_photo = photo;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 
         saveMessageLocally(data, 'Photo');
@@ -180,6 +182,7 @@ export async function sendVideo(req, res) {
         if (data.result) {
             if (caption) data.result.caption = caption;
             if (video && typeof video === 'string') data.result.url_video = video;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 
         saveMessageLocally(data, 'Video');
@@ -208,10 +211,9 @@ export async function sendAudio(req, res) {
         if (!data.ok) throw new Error(data.description);
 
         // 🌿 Preserve Media URL for local history
-        if (data.result && audio && typeof audio === 'string') {
-            data.result.url_audio = audio; // or url_voice? let's stick to what renderer expects
-            // renderer checks: msg.audio?.url or msg.url_audio (voice is checked separately)
-            // Actually renderer checks msg.audio?.url. Let's add url_voice too if needed.
+        if (data.result) {
+            if (audio && typeof audio === 'string') data.result.url_audio = audio;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 
         saveMessageLocally(data, 'Audio');
@@ -240,8 +242,9 @@ export async function sendVoice(req, res) {
         if (!data.ok) throw new Error(data.description);
 
         // 🌿 Preserve Media URL for local history
-        if (data.result && voice && typeof voice === 'string') {
-            data.result.url_voice = voice;
+        if (data.result) {
+            if (voice && typeof voice === 'string') data.result.url_voice = voice;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 
         saveMessageLocally(data, 'Voice');
