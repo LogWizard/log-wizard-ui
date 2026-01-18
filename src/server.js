@@ -47,7 +47,7 @@ app.get('/api/get-user-photo', async (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).send('User ID required');
 
-    console.log(`📸 Fetching avatar for user: ${userId}`);
+    // console.log(`📸 Fetching avatar for user: ${userId}`);
     const paramsOnConfig = await configManager.read();
     const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
@@ -57,11 +57,20 @@ app.get('/api/get-user-photo', async (req, res) => {
     }
 
     try {
+        const avatarDir = path.join(appDirectory, 'public', 'avatars');
+        if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+        const avatarFile = path.join(avatarDir, `${userId}.jpg`);
+
+        // 🌿 Check local cache first
+        if (fs.existsSync(avatarFile)) {
+            return res.json({ url: `/avatars/${userId}.jpg` });
+        }
+
         const profileUrl = `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`;
         const response = await fetch(profileUrl);
         const data = await response.json();
 
-        console.log(`📸 Telegram response for ${userId}:`, data.ok ? `OK, Photos: ${data.result?.total_count}` : `Error: ${data.description}`);
+        // console.log(`📸 Telegram response for ${userId}:`, data.ok ? `OK, Photos: ${data.result?.total_count}` : `Error: ${data.description}`);
 
         if (data.ok && data.result.total_count > 0) {
             const fileId = data.result.photos[0][0].file_id;
@@ -71,7 +80,18 @@ app.get('/api/get-user-photo', async (req, res) => {
             if (fileData.ok) {
                 const filePath = fileData.result.file_path;
                 const photoUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
-                return res.json({ url: photoUrl });
+
+                // 🌿 Save to local cache
+                try {
+                    const imgRes = await fetch(photoUrl);
+                    const arrayBuffer = await imgRes.arrayBuffer();
+                    const buffer = Buffer.from(arrayBuffer);
+                    fs.writeFileSync(avatarFile, buffer);
+                    return res.json({ url: `/avatars/${userId}.jpg` });
+                } catch (saveErr) {
+                    console.error('Failed to save avatar locally:', saveErr);
+                    return res.json({ url: photoUrl }); // Fallback to remote URL
+                }
             }
         }
         // 🌿 Return 200 OK with null url to prevent browser console 404 spam

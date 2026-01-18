@@ -294,9 +294,14 @@ function appendMessage(msg, container, lastDate, setLastDate) {
     // Check if element exists in DOM to update it
     const existingEl = document.getElementById(`msg-${mid}`);
     if (existingEl) {
-        // Create new bubble and replace old one to show updates (reactions etc)
+        // Create new bubble
         const newBubble = createMessageBubble(msg, type);
-        existingEl.replaceWith(newBubble);
+
+        // 🌿 Smart Update: Only replace if HTML is different!
+        // This prevents layout thrashing and scroll jumps for static messages.
+        if (existingEl.outerHTML !== newBubble.outerHTML) {
+            existingEl.replaceWith(newBubble);
+        }
         return;
     }
 
@@ -574,42 +579,53 @@ function createMessageBubble(msg, type) {
             </div>
         `;
 
-        // Async load avatar with spam protection 🌿
+        // Async load avatar with deduplication & caching 🌿💎
         if (userId) {
-            const currentUserId = userId; // Closure capture
-            setTimeout(async () => {
-                try {
-                    // Check if already failed previously to avoid re-fetching
-                    if (window.failedAvatars && window.failedAvatars.has(currentUserId)) return;
+            // Initialize cache if needed
+            if (!window.userAvatarCache) window.userAvatarCache = new Map();
+            if (!window.pendingAvatarRequests) window.pendingAvatarRequests = new Set(); // Prevent duplicate in-flight requests
 
-                    const res = await fetch(`/api/get-user-photo?user_id=${currentUserId}`);
+            // Check if we already have the URL
+            if (window.userAvatarCache.has(userId)) {
+                const cachedUrl = window.userAvatarCache.get(userId);
+                // Directly inject into HTML if possible, but regex replace on string is messy.
+                // We'll trust the DOM update logic below or update immediately after render.
+                // Actually, let's update the regex approach or just wait for next render? 
+                // Better: Update the HTML string in place before returning.
+                /* 
+                   Replacing the placeholder content in avatarHtml logic is tricky because we construct it above.
+                   Instead, we set a small script or rely on the data-user-id to update it immediately after append?
+                   No, 'createMessageBubble' returns a node. We can manipulate 'div' before return.
+                */
+                // We will update the element immediately after creation (at end of function)
+            } else {
+                // Request load if not pending
+                if (!window.pendingAvatarRequests.has(userId) && (!window.failedAvatars || !window.failedAvatars.has(userId))) {
+                    window.pendingAvatarRequests.add(userId);
 
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.url) {
-                            const avatarEl = div.querySelector(`.message-avatar[data-user-id="${currentUserId}"]`);
-                            if (avatarEl) {
-                                avatarEl.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    fetch(`/api/get-user-photo?user_id=${userId}`)
+                        .then(res => res.ok ? res.json() : null)
+                        .then(data => {
+                            if (data && data.url) {
+                                window.userAvatarCache.set(userId, data.url);
+                                // Live update all existing avatars for this user
+                                document.querySelectorAll(`.message-avatar[data-user-id="${userId}"]`).forEach(el => {
+                                    el.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                                });
+                            } else {
+                                if (!window.failedAvatars) window.failedAvatars = new Set();
+                                window.failedAvatars.add(userId);
                             }
-                        } else {
-                            // 200 OK but no URL (server suppressed 404) 🌿
+                        })
+                        .catch(() => {
                             if (!window.failedAvatars) window.failedAvatars = new Set();
-                            window.failedAvatars.add(currentUserId);
-                            reportAvatarErrors();
-                        }
-                    } else {
-                        // Real network error or 500
-                        if (!window.failedAvatars) window.failedAvatars = new Set();
-                        window.failedAvatars.add(currentUserId);
-                        reportAvatarErrors();
-                    }
-                } catch (e) {
-                    // Network error or other - collect too
-                    if (!window.failedAvatars) window.failedAvatars = new Set();
-                    window.failedAvatars.add(currentUserId);
-                    reportAvatarErrors();
+                            window.failedAvatars.add(userId);
+                        })
+                        .finally(() => {
+                            window.pendingAvatarRequests.delete(userId);
+                        });
                 }
-            }, 0);
+            }
         }
     }
 
@@ -629,6 +645,14 @@ function createMessageBubble(msg, type) {
             </div>
         </div>
     `;
+
+    // 🌿 Immediate Cache Application
+    if (msg.from?.id && window.userAvatarCache?.has(msg.from.id)) {
+        const cachedUrl = window.userAvatarCache.get(msg.from.id);
+        const avatarEl = div.querySelector(`.message-avatar[data-user-id="${msg.from.id}"]`);
+        if (avatarEl) avatarEl.innerHTML = `<img src="${cachedUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    }
+
     return div;
 }
 
