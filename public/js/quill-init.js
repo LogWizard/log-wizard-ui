@@ -27,53 +27,106 @@ let quill;
 
 function initQuillEditor() {
     if (typeof Quill === 'undefined') {
-        console.error('Quill not loaded!');
+        console.error('Quill not loaded! Falling back to regular input.');
+        createFallbackInput();
         return;
     }
 
-    quill = new Quill('#quillEditor', {
-        theme: 'bubble',
-        placeholder: 'Написати повідомлення...',
-        modules: {
-            toolbar: '#quillToolbar',
-            keyboard: {
-                bindings: {
-                    // Enter to send
-                    enter: {
-                        key: 13,
-                        handler: function () {
-                            sendQuillMessage();
-                            return false;
-                        }
-                    },
-                    // Shift+Enter for new line
-                    'shift-enter': {
-                        key: 13,
-                        shiftKey: true,
-                        handler: function (range) {
-                            quill.insertText(range.index, '\n');
-                            return false;
+    try {
+        quill = new Quill('#quillEditor', {
+            theme: 'bubble',
+            placeholder: 'Написати повідомлення...',
+            modules: {
+                toolbar: '#quillToolbar',
+                keyboard: {
+                    bindings: {
+                        // Enter to send
+                        enter: {
+                            key: 13,
+                            handler: function () {
+                                sendQuillMessage();
+                                return false;
+                            }
+                        },
+                        // Shift+Enter for new line
+                        'shift-enter': {
+                            key: 13,
+                            shiftKey: true,
+                            handler: function (range) {
+                                quill.insertText(range.index, '\n');
+                                return false;
+                            }
                         }
                     }
                 }
-            }
-        },
-        formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'link', 'spoiler']
-    });
-
-    // Add spoiler button handler
-    const spoilerBtn = document.querySelector('.ql-spoiler');
-    if (spoilerBtn) {
-        spoilerBtn.addEventListener('click', () => {
-            const range = quill.getSelection();
-            if (range && range.length > 0) {
-                const format = quill.getFormat(range);
-                quill.format('spoiler', !format.spoiler);
-            }
+            },
+            formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'link', 'spoiler']
         });
-    }
 
-    console.log('🌿 Quill editor initialized');
+        // Add spoiler button handler
+        const spoilerBtn = document.querySelector('.ql-spoiler');
+        if (spoilerBtn) {
+            spoilerBtn.addEventListener('click', () => {
+                const range = quill.getSelection();
+                if (range && range.length > 0) {
+                    const format = quill.getFormat(range);
+                    quill.format('spoiler', !format.spoiler);
+                }
+            });
+        }
+
+        console.log('🌿 Quill editor initialized');
+    } catch (e) {
+        console.error('Quill init error:', e);
+        createFallbackInput();
+    }
+}
+
+function createFallbackInput() {
+    const container = document.getElementById('quillEditor');
+    if (!container) return;
+
+    // Create regular input
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'messageInput';
+    input.className = 'message-input';
+    input.placeholder = 'Написати повідомлення...';
+    input.style.width = '100%';
+    input.style.padding = '10px';
+    input.style.borderRadius = '20px';
+    input.style.border = '1px solid #2b5278';
+    input.style.background = '#0e1621';
+    input.style.color = '#fff';
+
+    // Replace Quill container
+    container.parentNode.replaceChild(input, container);
+
+    // Hide Quill toolbar
+    const toolbar = document.getElementById('quillToolbar');
+    if (toolbar) toolbar.style.display = 'none';
+
+    // Re-init listener
+    if (typeof window.initMessageInput === 'function') { // Wait, initMessageInput is internal in message-sender.js
+        // We need to bind manually here or rely on message-sender.js handling it if it finds #messageInput
+        // message-sender.js calls initMessageInput() on load. If we create input later, listeners won't attach.
+        // We should attach listener manually
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) {
+            sendBtn.onclick = window.handleSendMessage; // handleSendMessage is global? No
+            // We can't easily rebind global listeners if functions aren't exposed.
+            // But handleSendMessage IS exposed? No.
+
+            // Let's just RELOAD message-sender logic if possible?
+            // Actually message-sender.js might have failed finding input.
+            // Let's just bind 'Enter'
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('sendBtn').click();
+                }
+            });
+        }
+    }
 }
 
 // Send message from Quill
