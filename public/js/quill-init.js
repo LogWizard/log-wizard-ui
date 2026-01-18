@@ -143,10 +143,91 @@ if (document.readyState === 'loading') {
     initQuillEditor();
 }
 
-// Expose to global scope
+// Export to global scope
 window.quill = quill;
 window.getQuillHTML = getQuillHTML;
 window.getQuillText = getQuillText;
 window.setQuillContent = setQuillContent;
 window.focusQuill = focusQuill;
 window.sendQuillMessage = sendQuillMessage;
+
+// ========== Manual Mode Logic 🌿 ==========
+
+/**
+ * Load manual mode state for chat
+ */
+window.loadManualModeState = async function (chatId) {
+    if (!chatId) return;
+
+    try {
+        const response = await fetch(`/api/get-manual-mode?chat_id=${chatId}`);
+        if (response.ok) {
+            const data = await response.json();
+            updateManualModeUI(data.enabled);
+        }
+    } catch (e) {
+        console.error('Error loading manual mode:', e);
+    }
+};
+
+/**
+ * Update UI checkboxes without triggering API
+ */
+function updateManualModeUI(enabled) {
+    const toolbarToggle = document.getElementById('manualModeToggleToolbar');
+    // Also sync with main header toggle if exists
+    const mainToggle = document.getElementById('manualModeToggle');
+
+    if (toolbarToggle) toolbarToggle.checked = enabled;
+    if (mainToggle) mainToggle.checked = enabled;
+
+    // Update label visual state if needed
+    // (CSS handles checkbox state)
+}
+
+/**
+ * Handle toggle change
+ */
+async function handleManualModeChange(e) {
+    const enabled = e.target.checked;
+    const chatId = window.selectedChatId; // Assuming global
+
+    if (!chatId) {
+        alert('Оберіть чат!');
+        e.target.checked = !enabled; // Revert
+        return;
+    }
+
+    // Optimistic update
+    updateManualModeUI(enabled);
+
+    try {
+        const response = await fetch('/api/set-manual-mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, enabled: enabled })
+        });
+
+        if (!response.ok) throw new Error('Failed');
+        console.log(`Manual mode ${enabled ? 'ON' : 'OFF'} for ${chatId}`);
+
+    } catch (err) {
+        console.error('Error setting manual mode:', err);
+        updateManualModeUI(!enabled); // Revert on error
+        alert('Error setting manual mode');
+    }
+}
+
+// Init listeners
+document.addEventListener('DOMContentLoaded', () => {
+    const toolbarToggle = document.getElementById('manualModeToggleToolbar');
+    if (toolbarToggle) {
+        toolbarToggle.addEventListener('change', handleManualModeChange);
+    }
+
+    // Sync with existing if present
+    const mainToggle = document.getElementById('manualModeToggle');
+    if (mainToggle) {
+        mainToggle.addEventListener('change', handleManualModeChange);
+    }
+});

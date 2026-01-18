@@ -204,7 +204,7 @@
                     </svg>
                 </button>
             </div>
-            <!-- Quill Formatting Toolbar -->
+            <!-- Quill Formatting Toolbar with Manual Mode Toggle 🌿 -->
             <div id="quillToolbar" class="formatting-toolbar quill-toolbar">
                 <button class="ql-bold" title="Bold"><b>B</b></button>
                 <button class="ql-italic" title="Italic"><i>I</i></button>
@@ -214,6 +214,14 @@
                 <button class="ql-blockquote" title="Quote">❝</button>
                 <button class="ql-link" title="Link">🔗</button>
                 <button class="ql-spoiler" title="Spoiler">👁️</button>
+                <!-- Spacer -->
+                <div style="flex: 1;"></div>
+                <!-- Manual Mode Toggle -->
+                <label class="manual-mode-switch" title="Manual Mode (AI OFF)">
+                    <input type="checkbox" id="manualModeToggleToolbar">
+                    <span class="slider-small"></span>
+                    <span class="label-text">🤖</span>
+                </label>
             </div>
         </div>
     </div>

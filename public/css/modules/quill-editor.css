@@ -154,9 +154,62 @@
         gap: 4px;
     }
 
+
     .quill-toolbar button {
         padding: 6px 10px;
         font-size: 12px;
         min-width: 28px;
     }
+}
+
+/* Manual Mode Toggle in Toolbar 🌿 */
+.manual-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    position: relative;
+    padding-left: 4px;
+}
+
+.manual-mode-switch input {
+    display: none;
+}
+
+.manual-mode-switch .slider-small {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background-color: #242f3d;
+    border-radius: 20px;
+    transition: 0.3s;
+    border: 1px solid #4a5568;
+}
+
+.manual-mode-switch .slider-small:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 1px;
+    background-color: #8b98a7;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.manual-mode-switch input:checked+.slider-small {
+    background-color: #ef4444;
+    /* Red for Manual */
+    border-color: #ef4444;
+}
+
+.manual-mode-switch input:checked+.slider-small:before {
+    transform: translateX(14px);
+    background-color: #fff;
+}
+
+.manual-mode-switch .label-text {
+    font-size: 14px;
+    line-height: 1;
 }
