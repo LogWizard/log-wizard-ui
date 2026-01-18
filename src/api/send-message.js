@@ -115,6 +115,11 @@ export async function sendMessage(req, res) {
             throw new Error(data.description || 'Telegram API error');
         }
 
+        // 🌿 Preserve HTML formatting for local history UI
+        if (data.result && text) {
+            data.result.text = text;
+        }
+
         saveMessageLocally(data, 'Message');
         res.json({ success: true, message: data.result });
     } catch (error) {
@@ -140,6 +145,11 @@ export async function sendPhoto(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
+        // 🌿 Preserve HTML formatting for local history UI
+        if (data.result && caption) {
+            data.result.caption = caption;
+        }
+
         saveMessageLocally(data, 'Photo');
         res.json({ success: true, message: data.result });
     } catch (error) {
@@ -164,6 +174,11 @@ export async function sendVideo(req, res) {
         const data = await response.json();
 
         if (!data.ok) throw new Error(data.description);
+
+        // 🌿 Preserve HTML formatting for local history UI
+        if (data.result && caption) {
+            data.result.caption = caption;
+        }
 
         saveMessageLocally(data, 'Video');
         res.json({ success: true, message: data.result });

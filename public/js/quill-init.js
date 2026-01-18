@@ -90,51 +90,38 @@ function initQuillEditor() {
             }
         });
 
-        // 2. Highlight (Marker) Handler
-        toolbar.addHandler('highlight', function () {
-            const range = quill.getSelection();
-            if (range) {
-                const format = quill.getFormat(range);
-                quill.format('highlight', !format.highlight);
-            }
-        });
-
-        // 3. Link Handler (Override)
+        // 2. Link Handler (Improved)
         toolbar.addHandler('link', function (value) {
             if (value) {
-                // If user clicked link button, value is true (or extracted url?)
-                // Actually value is true when clicked.
                 const range = quill.getSelection();
                 if (range) {
                     const currentFormat = quill.getFormat(range);
-                    const defaultValue = currentFormat.link || '';
+                    const defaultValue = currentFormat.link || 'https://';
 
                     const url = prompt('Введіть посилання (URL):', defaultValue);
-                    if (url) { // If user entered something
+                    quill.focus(); // 🌿 Restore focus to editor!
+
+                    if (url) {
                         quill.format('link', url);
-                    } else if (url === '') { // User cleared it
+                    } else if (url === '') {
                         quill.format('link', false);
                     }
-                    // If null (Cancel), do nothing
                 }
             } else {
                 quill.format('link', false);
             }
         });
 
-        // --- Force Restore Emoji Icons (if Quill overwrote them) ---
+        // --- Force Restore Emoji Icons ---
         setTimeout(() => {
             const spoilerBtn = document.querySelector('.ql-spoiler');
             if (spoilerBtn && !spoilerBtn.innerHTML.includes('👁️')) spoilerBtn.innerHTML = '👁️';
-
-            const highlightBtn = document.querySelector('.ql-highlight');
-            if (highlightBtn && !highlightBtn.innerHTML.includes('🖍️')) highlightBtn.innerHTML = '🖍️';
 
             const linkBtn = document.querySelector('.ql-link');
             if (linkBtn && !linkBtn.innerHTML.includes('🔗')) linkBtn.innerHTML = '🔗';
         }, 100);
 
-        console.log('🌿 Quill editor initialized with Correct Toolbar Handlers');
+        console.log('🌿 Quill editor initialized (Link Fixed, Marker Removed)');
     } catch (e) {
         console.error('Quill init error:', e);
         createFallbackInput();
