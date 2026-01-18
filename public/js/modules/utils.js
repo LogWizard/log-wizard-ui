@@ -58,7 +58,7 @@ export function getColorForUser(id) {
         hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
     const h = Math.abs(hash) % 360;
-    return \hsl(\, 70%, 50%)\;
+    return `hsl(${h}, 70%, 50%)`;
 }
 
 window.getColorForUser = getColorForUser;
