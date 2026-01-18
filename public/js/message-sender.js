@@ -429,7 +429,8 @@ function initRecordingHandlers() {
                 url: url,
                 type: file.type,
                 file: file,
-                isRecordedNote: true // 🌿 Flag to force Note Mode send
+                isRecordedNote: true, // 🌿 Flag to force Note Mode send
+                recordingType: type   // 'audio' or 'video'
             };
 
             // Force Toggle visually for user feedback
@@ -575,15 +576,20 @@ async function handleSendMessage() {
             // 🌿 Note Mode is Active IF Toggle is ON OR File was Recorded Live
             const isNoteMode = document.getElementById('videoNoteToggle')?.checked || attachmentToSend.isRecordedNote;
 
-            if (isWebm) {
-                // 🌿 Auto-send .webm as Sticker
-                response = await sendSticker(selectedChatId, attachmentToSend.url);
-            } else if (attachmentToSend.type.startsWith('video/') && isNoteMode) {
-                // 🌿 Send as Video Note (Circle)
-                response = await sendVideoNote(selectedChatId, attachmentToSend.url);
-            } else if (attachmentToSend.type.startsWith('audio/') && isNoteMode) {
-                // 🌿 Send as Voice Note (Converted)
-                response = await sendVoiceNote(selectedChatId, attachmentToSend.url);
+            if (isNoteMode) {
+                // 🌿 Handle Round Video / Voice Note
+                const isAudio = attachmentToSend.recordingType === 'audio' || attachmentToSend.type.includes('audio');
+
+                if (isAudio) {
+                    // Send as Voice Message
+                    response = await sendVoiceNote(selectedChatId, attachmentToSend.url || attachmentToSend.file);
+                } else {
+                    // Send as Video Note (Circle)
+                    response = await sendVideoNote(selectedChatId, attachmentToSend.url || attachmentToSend.file);
+                }
+            } else if (isWebm) {
+                // 🌿 Auto-send .webm as Sticker (ONLY if not Note Mode)
+                response = await sendSticker(selectedChatId, attachmentToSend.url || attachmentToSend.file);
             } else if (attachmentToSend.type.startsWith('image/')) {
                 response = await sendPhoto(selectedChatId, attachmentToSend.url, finalText);
             } else if (attachmentToSend.type.startsWith('video/')) {
