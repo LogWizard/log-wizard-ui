@@ -112,18 +112,25 @@ function switchView(view) {
         if (state.ui.toggleLabel) state.ui.toggleLabel.style.display = 'none';
         document.body.classList.add('mobile-chat-active');
 
-        // Spinner
-        state.ui.messagesContainer.innerHTML = `
-            <div class="loading-spinner-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888;">
-                <div class="spinner" style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
-                <div class="loading-text">Завантажую Timeline... 🌿</div>
-            </div>
-            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-        `;
-
-        // Force reset fetch logic to "refresh" timeline
-        // Maybe we just call fetchMessages?
-        fetchMessages();
+        // 🌿 FIX: Якщо повідомлення вже є - рендеримо одразу!
+        if (state.allMessages.length > 0) {
+            renderTimelineView(true);
+        } else {
+            // Spinner тільки якщо нема повідомлень
+            state.ui.messagesContainer.innerHTML = `
+                <div class="loading-spinner-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888;">
+                    <div class="spinner" style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                    <div class="loading-text">Завантажую Timeline... 🌿</div>
+                </div>
+                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+            `;
+            // Fetch і потім рендер
+            fetchMessages().then(() => {
+                if (state.allMessages.length > 0) {
+                    renderTimelineView(true);
+                }
+            });
+        }
     }
 }
 
