@@ -342,18 +342,46 @@ async function handleSendMessage() {
     const finalText = telegramHtml.includes('<') ? telegramHtml : telegramHtml; // Always use what we prepared (HTML)
 
     try {
+        let sentMessage = null; // 🌿 To capture server response
+
         if (attachmentToSend) {
             // Send attachment with caption
+            let response;
             if (attachmentToSend.type.startsWith('image/')) {
-                await sendPhoto(selectedChatId, attachmentToSend.url, finalText);
+                response = await sendPhoto(selectedChatId, attachmentToSend.url, finalText);
             } else if (attachmentToSend.type.startsWith('video/')) {
-                await sendVideo(selectedChatId, attachmentToSend.url, finalText);
+                response = await sendVideo(selectedChatId, attachmentToSend.url, finalText);
             } else if (attachmentToSend.type.startsWith('audio/')) {
-                await sendAudio(selectedChatId, attachmentToSend.url, attachmentToSend.type.includes('ogg'));
+                response = await sendAudio(selectedChatId, attachmentToSend.url, attachmentToSend.type.includes('ogg'));
             }
+            if (response && response.success) sentMessage = response.message;
         } else {
             // Send text only
-            await sendTextMessage(selectedChatId, finalText);
+            const response = await sendTextMessage(selectedChatId, finalText);
+            if (response && response.success) sentMessage = response.message;
+        }
+
+        // 🌿 Instant UI Update (CRITICAL for Bot Messages)
+        if (sentMessage && window.chatGroups && window.chatGroups[selectedChatId]) {
+            console.log('🌿 Adding sent message to UI immediately:', sentMessage);
+
+            // Add to chat history
+            window.chatGroups[selectedChatId].messages.push(sentMessage);
+            window.chatGroups[selectedChatId].lastMessage = sentMessage; // Update last message for list sorting
+
+            // If in active chat, render it
+            if (window.selectedChatId === selectedChatId && typeof window.renderChatMessages === 'function') {
+                window.renderChatMessages(selectedChatId);
+
+                // Scroll to bottom
+                const container = document.getElementById('messages-container');
+                if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            }
+
+            // Update chat list ranking/preview if possible
+            if (typeof window.renderChatListView === 'function') {
+                window.renderChatListView();
+            }
         }
 
         // Clear editor
@@ -367,7 +395,7 @@ async function handleSendMessage() {
         console.log('📤 Message sent successfully');
     } catch (error) {
         alert('Помилка відправки: ' + error.message);
-        // Restore attachment on error?
+        // Restore attachment on error
         if (attachmentToSend) {
             pendingAttachment = attachmentToSend;
             updateAttachmentPreview();
