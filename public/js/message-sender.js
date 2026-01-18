@@ -1,10 +1,39 @@
 // ========== Message Sender Module 🌿 ==========
 // Функції глобальні (без ES modules)
 
+let pendingAttachment = null; // { url, type, file } 🌿
+
+/**
+ * Update Preview UI
+ */
+function updateAttachmentPreview() {
+    const previewContainer = document.getElementById('attachmentPreview');
+    if (!previewContainer) return;
+
+    if (!pendingAttachment) {
+        previewContainer.style.display = 'none';
+        return;
+    }
+
+    previewContainer.style.display = 'flex';
+    document.getElementById('previewFilename').textContent = pendingAttachment.file.name;
+    document.getElementById('previewType').textContent = pendingAttachment.type;
+
+    // Bind remove button
+    const removeBtn = document.getElementById('removeAttachmentBtn');
+    if (removeBtn) {
+        removeBtn.onclick = () => {
+            pendingAttachment = null;
+            updateAttachmentPreview();
+        };
+    }
+}
+
 /**
  * Send text message to Telegram
  */
 async function sendTextMessage(chatId, text, replyToMessageId = null) {
+
     try {
         const response = await fetch('/api/send-message', {
             method: 'POST',
@@ -223,7 +252,7 @@ async function handleSendMessage() {
         }
     }
 
-    if (!text) return;
+    if (!text && !pendingAttachment) return; // Allow empty text if attachment exists 🌿
 
     // Get current chat ID
     const selectedChatId = window.selectedChatId;
@@ -281,7 +310,23 @@ async function handleSendMessage() {
             }
         }
 
-        await sendTextMessage(selectedChatId, finalText);
+        if (pendingAttachment) {
+            // Send attachment with caption
+            if (pendingAttachment.type.startsWith('image/')) {
+                await sendPhoto(selectedChatId, pendingAttachment.url, finalText);
+            } else if (pendingAttachment.type.startsWith('video/')) {
+                await sendVideo(selectedChatId, pendingAttachment.url, finalText);
+            } else if (pendingAttachment.type.startsWith('audio/')) {
+                await sendAudio(selectedChatId, pendingAttachment.url, pendingAttachment.type.includes('ogg'));
+            }
+
+            // Clear attachment
+            pendingAttachment = null;
+            updateAttachmentPreview();
+        } else {
+            // Send text only
+            await sendTextMessage(selectedChatId, finalText);
+        }
 
         // Clear editor
         if (window.quill) {
@@ -320,15 +365,20 @@ function handleAttachFile() {
             }
 
             // Determine file type and send accordingly
-            if (file.type.startsWith('image/')) {
-                await sendPhoto(selectedChatId, url);
-            } else if (file.type.startsWith('video/')) {
-                await sendVideo(selectedChatId, url);
-            } else if (file.type.startsWith('audio/')) {
-                await sendAudio(selectedChatId, url, file.type.includes('ogg'));
+            if (!selectedChatId) {
+                alert('Оберіть чат!');
+                return;
             }
 
-            console.log('✅ Media sent successfully');
+            // Store pending attachment 🌿
+            pendingAttachment = {
+                url: url,
+                type: file.type,
+                file: file
+            };
+            updateAttachmentPreview();
+
+            console.log('✅ File ready to send');
         } catch (error) {
             alert('Помилка: ' + error.message);
         }
