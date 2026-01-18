@@ -1250,3 +1250,47 @@ body {
     }
 }
 
+
+/* Ultra-Visibility for Sticker Reactions */
+.message-bubble.sticker-only .message-reactions {
+    margin-top: 4px !important;
+    background: transparent !important; /* Let chips stand out */
+    padding: 2px !important;
+    position: relative;
+    z-index: 200 !important; /* Above everything */
+    pointer-events: auto !important;
+    display: flex !important;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* Align left usually, or center? */
+}
+
+.message-bubble.sticker-only .reaction-chip {
+    background-color: rgba(30, 40, 55, 0.85) !important; /* Solid dark background */
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: #ffffff !important;
+    font-size: 18px !important; /* Make emoji clearly visible */
+    line-height: 1.2 !important;
+    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    height: auto !important;
+    min-height: 28px !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    text-shadow: none !important; /* Remove shadows that might blur emoji */
+}
+
+/* Ensure font rendering for emoji */
+.reaction-chip, .reaction-chip span {
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif !important;
+}
+
+/* Fix overlay issues */
+.sticker-only .media-content {
+    z-index: 1;
+}
+
