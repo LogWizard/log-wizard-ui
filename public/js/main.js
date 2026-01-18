@@ -15,6 +15,14 @@ function init() {
 
     // Load Cache first for instant feel 🌿
     if (loadState()) {
+        // Deep Linking Override 🌿
+        const params = new URLSearchParams(window.location.search);
+        const urlChatId = params.get('chat_id');
+        if (urlChatId) {
+            state.selectedChatId = urlChatId; // Force URL override
+            window.selectedChatId = urlChatId;
+        }
+
         renderChatListView();
         if (state.selectedChatId) renderChatMessages(state.selectedChatId);
     }

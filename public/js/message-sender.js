@@ -231,6 +231,9 @@ function initMessageInput() {
 
     // Drag and drop
     initDragAndDrop();
+
+    // Paste from Clipboard 🌿
+    initPasteHandler();
 }
 
 /**
@@ -428,12 +431,6 @@ function handleAttachFile() {
                 return;
             }
 
-            // Determine file type and send accordingly
-            if (!selectedChatId) {
-                alert('Оберіть чат!');
-                return;
-            }
-
             // Store pending attachment 🌿
             pendingAttachment = {
                 url: url,
@@ -505,17 +502,63 @@ function initDragAndDrop() {
                 return;
             }
 
-            if (file.type.startsWith('image/')) {
-                await sendPhoto(selectedChatId, url);
-            } else if (file.type.startsWith('video/')) {
-                await sendVideo(selectedChatId, url);
-            } else if (file.type.startsWith('audio/')) {
-                await sendAudio(selectedChatId, url);
-            }
+            // Use pending attachment flow for consistency
+            pendingAttachment = {
+                url: url,
+                type: file.type,
+                file: file
+            };
+            updateAttachmentPreview();
 
-            console.log('✅ Dropped file sent');
+            console.log('✅ Dropped file ready to send');
         } catch (error) {
             alert('Помилка: ' + error.message);
+        }
+    });
+}
+
+/**
+ * Initialize Paste Handler (Ctrl+V) 🌿
+ */
+function initPasteHandler() {
+    document.addEventListener('paste', async (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+
+        for (const item of items) {
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (!file) continue;
+
+                // Only allow supported types if needed, but uploadFile handles it
+                console.log('📋 Paste detected:', file.type);
+
+                e.preventDefault(); // Prevent default paste (e.g. img tag in editor)
+
+                try {
+                    const url = await uploadFile(file);
+                    const selectedChatId = window.selectedChatId;
+
+                    if (!selectedChatId) {
+                        alert('Оберіть чат!');
+                        return;
+                    }
+
+                    pendingAttachment = {
+                        url: url,
+                        type: file.type,
+                        file: file
+                    };
+                    updateAttachmentPreview();
+                    console.log('✅ Pasted file ready');
+
+                } catch (error) {
+                    console.error('Paste upload error:', error);
+                    alert('Error pasting file: ' + error.message);
+                }
+
+                // Only handle the first file
+                return;
+            }
         }
     });
 }

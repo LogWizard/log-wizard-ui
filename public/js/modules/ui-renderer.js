@@ -169,6 +169,11 @@ export async function selectChat(chatId) {
     state.selectedChatId = chatId;
     window.selectedChatId = chatId;
 
+    // 🌿 Update URL for deep linking
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.set('chat_id', chatId);
+    window.history.pushState({}, '', newUrl);
+
     // Manual State Logic
     if (typeof loadManualModeState === 'function') loadManualModeState(chatId);
 
@@ -193,6 +198,10 @@ export async function selectChat(chatId) {
         if (state.ui.activeChatName) state.ui.activeChatName.textContent = chat.name;
         if (state.ui.activeChatStatus) state.ui.activeChatStatus.textContent = `${chat.messages.length} messages`;
         renderChatMessages(chatId);
+
+        // Scroll to bottom
+        const container = state.ui.messagesContainer;
+        if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
 
     document.body.classList.add('mobile-chat-active');
