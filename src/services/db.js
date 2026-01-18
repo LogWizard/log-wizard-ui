@@ -5,28 +5,46 @@ dotenv.config();
 
 // Configuration 🌿
 const dbConfig = {
-    host: process.env.DB_HOST || '127.0.0.1',
+    host: process.env.DB_HOST || '127.0.0.1', // Or localhost
     port: parseInt(process.env.DB_PORT || '3307'),
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    multipleStatements: true // Allow initialization scripts
+    password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : '' // Default empty
 };
 
 let pool = null;
 
-export async function initDB() {
+// Helper to try connection with specific config
+async function attemptConnection(config) {
     try {
-        console.log('🔌 Connecting to MariaDB...', { host: dbConfig.host, port: dbConfig.port });
+        const conn = await mysql.createConnection(config);
+        return conn;
+    } catch (e) {
+        return null;
+    }
+}
 
-        // 1. Connect without Database to Create it
-        const connection = await mysql.createConnection({
-            host: dbConfig.host,
-            port: dbConfig.port,
-            user: dbConfig.user,
-            password: dbConfig.password
-        });
+export async function initDB() {
+    console.log('🔌 Connecting to MariaDB...', { host: dbConfig.host, port: dbConfig.port, user: dbConfig.user });
 
-        console.log('✨ Connected! Identifying database...');
+    let connection = null;
+
+    // 1. Try with configurated password
+    connection = await attemptConnection({ ...dbConfig, database: undefined });
+
+    // 2. If failed and password was empty, try 'root'
+    if (!connection && !dbConfig.password) {
+        console.warn('⚠️ Connection failed with empty password. Trying "root"...');
+        connection = await attemptConnection({ ...dbConfig, password: 'root', database: undefined });
+        if (connection) dbConfig.password = 'root'; // Update config
+    }
+
+    if (!connection) {
+        console.error('❌ Database Connection Failed! Please check your credentials and port (3307).');
+        return null;
+    }
+
+    try {
+        console.log('✨ Connected! Checking database...');
 
         // 2. Create Database if not exists
         await connection.query(`CREATE DATABASE IF NOT EXISTS log_wizard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
@@ -38,7 +56,7 @@ export async function initDB() {
             database: 'log_wizard',
             waitForConnections: true,
             connectionLimit: 10,
-            queueLimit: 0
+            multipleStatements: true
         });
 
         // 4. Init Tables
@@ -48,8 +66,7 @@ export async function initDB() {
         return pool;
 
     } catch (error) {
-        console.error('❌ Database Initialization Error:', error.message);
-        // Do not crash app, just log error (maybe retry?)
+        console.error('❌ Database Init Error:', error.message);
         return null;
     }
 }
@@ -62,40 +79,45 @@ async function createTables() {
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(255) NOT NULL UNIQUE,
             title VARCHAR(255),
-            is_active BOOLEAN DEFAULT TRUE,
+            is_active BOOLEAN DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        
-        -- Optional: Cache individual stickers to avoid frequent API calls?
-        -- For now, we trust the set structure from API.
     `;
 
     await pool.query(query);
 
-    // Seed default sets if empty
-    const [rows] = await pool.query('SELECT COUNT(*) as count FROM sticker_sets');
-    if (rows[0].count === 0) {
-        console.log('🌱 Seeding default sticker sets...');
-        const defaults = [
-            'Brilevsky',
-            'VikostVSpack',
-            'horoshok_k_by_fStikBot',
-            'CystsDribsAssai_by_fStikBot'
-        ];
+    // Seed default sets ALWAYS if they are missing
+    const defaults = [
+        'Brilevsky',
+        'VikostVSpack',
+        'horoshok_k_by_fStikBot',
+        'CystsDribsAssai_by_fStikBot'
+    ];
 
-        for (const set of defaults) {
-            await pool.query('INSERT IGNORE INTO sticker_sets (name, title) VALUES (?, ?)', [set, set]);
+    // Efficient seeding: Insert Ignore
+    for (const set of defaults) {
+        // Try to insert
+        try {
+            // INSERT IGNORE doesn't work well with promise pools sometimes returning warnings instead of rows
+            // Use ON DUPLICATE KEY UPDATE to ensure it's there and active
+            await pool.query('INSERT INTO sticker_sets (name, title) VALUES (?, ?) ON DUPLICATE KEY UPDATE is_active = 1', [set, set]);
+        } catch (e) {
+            console.error('Seed Error:', e.message);
         }
     }
+    console.log('🌱 Seeded sticker sets.');
 }
 
 export async function getStickerSets() {
-    if (!pool) return [];
+    if (!pool) {
+        console.warn('⚠️ DB Pool not ready for getStickerSets');
+        return [];
+    }
     try {
-        const [rows] = await pool.query('SELECT * FROM sticker_sets WHERE is_active = 1 ORDER BY id ASC');
+        const [rows] = await pool.query('SELECT * FROM sticker_sets WHERE is_active = 1 ORDER BY id DESC'); // Newest first
         return rows;
     } catch (e) {
-        console.error('DB Error:', e);
+        console.error('DB Select Error:', e);
         return [];
     }
 }
