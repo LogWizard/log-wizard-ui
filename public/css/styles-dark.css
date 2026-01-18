@@ -1294,3 +1294,66 @@ body {
     z-index: 1;
 }
 
+
+/* --- STICKER REACTION FIXES V2 --- */
+
+/* Container for reactions AND the add button */
+.message-bubble.sticker-only .message-reactions,
+.message-bubble.sticker-only + .add-reaction-btn, 
+.message-bubble.sticker-only .add-reaction-btn {
+    position: relative;
+    z-index: 500 !important;
+}
+
+/* Make the Add Reaction button visible and usable on stickers */
+.message-bubble.sticker-only .add-reaction-btn {
+    background: rgba(40, 50, 65, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-left: 6px;
+    opacity: 1 !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    vertical-align: middle;
+}
+
+/* Ensure the reaction chip itself is perfectly visible */
+.message-bubble.sticker-only .reaction-chip {
+    background-color: rgba(33, 150, 243, 0.2) !important; /* Slight blue tint */
+    border: 1px solid rgba(100, 181, 246, 0.5) !important;
+    color: #ffffff !important;
+    min-width: 30px;
+    height: 28px;
+    padding: 0 8px !important;
+    border-radius: 14px !important;
+    font-size: 18px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Force colorful emojis by resetting color (supports some browsers) */
+/* .reaction-chip span { color: initial !important; } */
+
+/* Ensure the wrapper does not clip */
+.message-bubble.sticker-only, 
+.message-bubble.sticker-only .bubble-content {
+    overflow: visible !important;
+}
+
+/* Fix z-index for the whole sticker bubble so it allows popups */
+.message-bubble.sticker-only {
+    z-index: auto;
+}
+
