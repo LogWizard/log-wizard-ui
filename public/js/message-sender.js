@@ -386,23 +386,19 @@ function initStickerPicker() {
 
             stickerSets = sets;
 
-            // Clear old tabs (except + button logic handled inside rebuild)
+            // Clear old tabs (keep + logic separate if needed, but rebuilding is safer)
             tabsHeader.innerHTML = '';
 
-            // Re-add import button
+            // Re-add import button (+)
             const addBtn = document.createElement('div');
             addBtn.textContent = '+';
             addBtn.title = 'Add Sticker Set';
-            addBtn.style.cssText = 'padding: 5px 10px; cursor: pointer; font-weight: bold; color: #4caf50; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-right: 5px;';
+            addBtn.style.cssText = 'padding: 5px 10px; cursor: pointer; font-weight: bold; color: #4caf50; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-right: 5px; min-width: 24px; text-align: center;';
             addBtn.onclick = async () => {
                 const name = prompt('Enter Sticker Set Name (e.g., "VikostVSpack"):');
                 if (name) {
                     try {
-                        const res = await fetch('/api/sticker-sets/import', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ setName: name })
-                        });
+                        const res = await fetch('/api/sticker-sets/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setName: name }) });
                         const data = await res.json();
                         if (data.error) throw new Error(data.error);
                         loadSets();
@@ -417,7 +413,7 @@ function initStickerPicker() {
                 tab.title = set;
                 tab.style.cssText = 'padding: 5px 10px; cursor: pointer; font-size: 12px; color: #8b98a7; white-space: nowrap; border-radius: 10px; transition: all 0.2s;';
 
-                // Active state logic
+                // Active state logic - only highlight the active set tab, not the + button
                 if (index === currentSetIndex) {
                     tab.style.color = '#64b5f6';
                     tab.style.background = 'rgba(100, 181, 246, 0.1)';
