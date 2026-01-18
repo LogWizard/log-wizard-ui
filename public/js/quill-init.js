@@ -20,8 +20,21 @@ class SpoilerBlot extends Inline {
 SpoilerBlot.blotName = 'spoiler';
 SpoilerBlot.tagName = 'span';
 
+// Custom Highlight Blot (aka "Weird Mode" 🖍️)
+class HighlightBlot extends Inline {
+    static create() {
+        const node = super.create();
+        node.setAttribute('class', 'tg-highlight');
+        return node;
+    }
+    static formats(node) { return true; }
+}
+HighlightBlot.blotName = 'highlight'; // matches button class ql-highlight
+HighlightBlot.tagName = 'span';
+
 // Register cleanly
 Quill.register('formats/spoiler', SpoilerBlot);
+Quill.register('formats/highlight', HighlightBlot);
 
 // Initialize Quill
 let quill;
@@ -59,7 +72,7 @@ function initQuillEditor() {
                     }
                 }
             },
-            formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'link', 'spoiler']
+            formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'link', 'spoiler', 'highlight']
         });
 
         // 🌿 EXPORT GLOBALLY NOW (Crucial Fix)

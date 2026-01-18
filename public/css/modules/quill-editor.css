@@ -201,12 +201,32 @@
     text-shadow: none !important;
 }
 
+/* Custom Highlight Style (Marker / Weird Mode) 🖍️ */
+.ql-editor .tg-highlight {
+    background-color: #fca5a5 !important;
+    /* Soft Red/Pink Highlight */
+    color: #450a0a !important;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-weight: 700;
+    border: 1px solid #f87171;
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+
 /* Custom Toolbar Button Size */
 .ql-toolbar.ql-snow button {
     width: 28px !important;
     height: 28px !important;
-    padding: 4px !important;
+    padding: 3px !important;
     border-radius: 4px;
+}
+
+.ql-toolbar.ql-snow button.ql-highlight {
+    color: #f87171 !important;
+}
+
+.ql-toolbar.ql-snow button.ql-highlight:hover {
+    color: #ef4444 !important;
 }
 
 .ql-toolbar.ql-snow button:hover {

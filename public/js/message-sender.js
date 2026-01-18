@@ -282,7 +282,7 @@ async function handleSendMessage() {
     const finalText = telegramHtml.includes('<') ? telegramHtml : text;
 
     try {
-        // 🌿 Optimistic UI Update
+        /* 🌿 Optimistic UI Update DISABLED (Let "The Goose" handle it) 
         const tempMsg = {
             message_id: 'temp-' + Date.now(),
             from: { id: 'bot', first_name: 'Gys Bot 🦆', is_bot: true },
@@ -309,6 +309,7 @@ async function handleSendMessage() {
                 if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
             }
         }
+        */
 
         if (pendingAttachment) {
             // Send attachment with caption

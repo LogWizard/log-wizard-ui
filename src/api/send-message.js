@@ -4,6 +4,7 @@ import { ConfigManager } from '../config-manager.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import FormData from 'form-data'; // 🌿 Added for local file uploads
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +15,76 @@ const configManager = new ConfigManager(path.join(appDirectory, 'config.json'));
 const config = configManager.read();
 const BOT_TOKEN = process.env.BOT_TOKEN || config['Bot Token'] || '';
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+/**
+ * 🌿 Helper to send media (Handling Local Files Stream)
+ */
+async function sendMediaRequest(endpoint, payload, mediaKey, mediaUrl) {
+    // Check if mediaUrl is a local upload path
+    if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.includes('/uploads/')) {
+        try {
+            // Extract filename from URL (e.g., https://host/uploads/file.png -> file.png)
+            const filename = mediaUrl.split('/uploads/').pop();
+            const localPath = path.join(appDirectory, 'public', 'uploads', filename);
+
+            if (fs.existsSync(localPath)) {
+                console.log(`🌿 Found local file: ${localPath}, sending as Stream...`);
+                const form = new FormData();
+                form.append(mediaKey, fs.createReadStream(localPath));
+
+                // Append other payload fields
+                for (const [key, value] of Object.entries(payload)) {
+                    if (key !== mediaKey && value !== undefined && value !== null) {
+                        form.append(key, value);
+                    }
+                }
+
+                return await fetch(`${TELEGRAM_API}/${endpoint}`, {
+                    method: 'POST',
+                    headers: form.getHeaders(),
+                    body: form
+                });
+            } else {
+                console.warn(`⚠️ Local file not found: ${localPath}, falling back to URL`);
+            }
+        } catch (err) {
+            console.error('⚠️ Error preparing local file stream:', err);
+        }
+    }
+
+    // Default: Send as URL (JSON)
+    return await fetch(`${TELEGRAM_API}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+}
+
+/**
+ * 🌿 Helper to Save Message Locally (Persistence)
+ */
+function saveMessageLocally(data, type = 'message') {
+    try {
+        const msg = data.result;
+        const dateObj = new Date(msg.date * 1000);
+        const dateStr = dateObj.toLocaleDateString('uk-UA'); // DD.MM.YYYY
+        const currentConfig = configManager.read();
+        const msgPathBase = currentConfig['Listening Path'] || 'messages';
+        const folderPath = path.join(msgPathBase, dateStr);
+
+        if (!fs.existsSync(folderPath)) {
+            fs.mkdirSync(folderPath, { recursive: true });
+        }
+
+        const fileName = `${msg.message_id}.json`;
+        const filePath = path.join(folderPath, fileName);
+        fs.writeFileSync(filePath, JSON.stringify(msg, null, 2));
+        console.log(`✅ ${type} saved to ${filePath}`);
+    } catch (saveError) {
+        console.error(`⚠️ Failed to save ${type} locally:`, saveError);
+    }
+}
+
 
 /**
  * POST /api/send-message
@@ -44,44 +115,7 @@ export async function sendMessage(req, res) {
             throw new Error(data.description || 'Telegram API error');
         }
 
-        // 🌿 SAVE TO LOCAL FILE (PERSISTENCE)
-        try {
-            const msg = data.result;
-            const dateObj = new Date(msg.date * 1000);
-            const dateStr = dateObj.toLocaleDateString('uk-UA'); // DD.MM.YYYY
-
-            // Determine path: MSG_PATH/DD.MM.YYYY/
-            // Note: We need MSG_PATH. configManager might need to be re-read or passed.
-            // Assuming config has 'Listening Path' or using default from server.js logic is hard here without import.
-            // Let's rely on configManager which we have.
-            const currentConfig = configManager.read();
-            const msgPathBase = currentConfig['Listening Path'] || 'messages'; // Fallback
-
-            const folderPath = path.join(msgPathBase, dateStr);
-
-            if (!fs.existsSync(folderPath)) {
-                fs.mkdirSync(folderPath, { recursive: true });
-            }
-
-            // Save as JSON: ID.json (like existing structure) or Timestamp_ID.json?
-            // Existing structure seems to be 1 file per message? 
-            // Looking at server.js: fs.readdirSync(datePath)... JSON.parse(content)...
-            // So yes, one file per message.
-            const fileName = `${msg.message_id}.json`;
-            const filePath = path.join(folderPath, fileName);
-
-            // Add our "user" field for UI to know it's us (Bot) if needed, 
-            // but Telegram response has "from" field which is the Bot.
-            // UI treats "from.id" == "bot" or "isBot" flag.
-
-            fs.writeFileSync(filePath, JSON.stringify(msg, null, 2));
-            console.log(`✅ Message saved to ${filePath}`);
-
-        } catch (saveError) {
-            console.error('⚠️ Failed to save message locally:', saveError);
-            // Don't fail the request, just log
-        }
-
+        saveMessageLocally(data, 'Message');
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending message:', error);
@@ -100,31 +134,13 @@ export async function sendPhoto(req, res) {
     }
 
     try {
-        const response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id, photo, caption })
-        });
-
+        const payload = { chat_id, photo, caption, parse_mode: 'HTML' };
+        const response = await sendMediaRequest('sendPhoto', payload, 'photo', photo);
         const data = await response.json();
 
-        if (!data.ok) {
-            throw new Error(data.description);
-        }
+        if (!data.ok) throw new Error(data.description);
 
-        // 🌿 SAVE TO LOCAL FILE (PERSISTENCE)
-        try {
-            const msg = data.result;
-            const dateObj = new Date(msg.date * 1000);
-            const dateStr = dateObj.toLocaleDateString('uk-UA');
-            const currentConfig = configManager.read();
-            const msgPathBase = currentConfig['Listening Path'] || 'messages';
-            const folderPath = path.join(msgPathBase, dateStr);
-            if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
-            fs.writeFileSync(path.join(folderPath, `${msg.message_id}.json`), JSON.stringify(msg, null, 2));
-            console.log(`✅ Photo message saved`);
-        } catch (e) { console.error('⚠️ Save error:', e); }
-
+        saveMessageLocally(data, 'Photo');
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending photo:', error);
@@ -143,31 +159,13 @@ export async function sendVideo(req, res) {
     }
 
     try {
-        const response = await fetch(`${TELEGRAM_API}/sendVideo`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id, video, caption })
-        });
-
+        const payload = { chat_id, video, caption, parse_mode: 'HTML' };
+        const response = await sendMediaRequest('sendVideo', payload, 'video', video);
         const data = await response.json();
 
-        if (!data.ok) {
-            throw new Error(data.description);
-        }
+        if (!data.ok) throw new Error(data.description);
 
-        // 🌿 SAVE TO LOCAL FILE (PERSISTENCE)
-        try {
-            const msg = data.result;
-            const dateObj = new Date(msg.date * 1000);
-            const dateStr = dateObj.toLocaleDateString('uk-UA');
-            const currentConfig = configManager.read();
-            const msgPathBase = currentConfig['Listening Path'] || 'messages';
-            const folderPath = path.join(msgPathBase, dateStr);
-            if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
-            fs.writeFileSync(path.join(folderPath, `${msg.message_id}.json`), JSON.stringify(msg, null, 2));
-            console.log(`✅ Video message saved`);
-        } catch (e) { console.error('⚠️ Save error:', e); }
-
+        saveMessageLocally(data, 'Video');
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending video:', error);
@@ -186,32 +184,13 @@ export async function sendAudio(req, res) {
     }
 
     try {
-        const response = await fetch(`${TELEGRAM_API}/sendAudio`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id, audio })
-        });
-
+        const payload = { chat_id, audio };
+        const response = await sendMediaRequest('sendAudio', payload, 'audio', audio);
         const data = await response.json();
 
-        if (!data.ok) {
-            throw new Error(data.description);
-        }
+        if (!data.ok) throw new Error(data.description);
 
-        // 🌿 SAVE TO LOCAL FILE (PERSISTENCE)
-        try {
-            const msg = data.result;
-            const dateObj = new Date(msg.date * 1000);
-            const dateStr = dateObj.toLocaleDateString('uk-UA');
-            const currentConfig = configManager.read();
-            const msgPathBase = currentConfig['Listening Path'] || 'messages';
-            const folderPath = path.join(msgPathBase, dateStr);
-            if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
-            // Fix: sendAudio might not return duration in response immediately or differently
-            fs.writeFileSync(path.join(folderPath, `${msg.message_id}.json`), JSON.stringify(msg, null, 2));
-            console.log(`✅ Audio message saved`);
-        } catch (e) { console.error('⚠️ Save error:', e); }
-
+        saveMessageLocally(data, 'Audio');
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending audio:', error);
@@ -230,31 +209,13 @@ export async function sendVoice(req, res) {
     }
 
     try {
-        const response = await fetch(`${TELEGRAM_API}/sendVoice`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id, voice })
-        });
-
+        const payload = { chat_id, voice };
+        const response = await sendMediaRequest('sendVoice', payload, 'voice', voice);
         const data = await response.json();
 
-        if (!data.ok) {
-            throw new Error(data.description);
-        }
+        if (!data.ok) throw new Error(data.description);
 
-        // 🌿 SAVE TO LOCAL FILE (PERSISTENCE)
-        try {
-            const msg = data.result;
-            const dateObj = new Date(msg.date * 1000);
-            const dateStr = dateObj.toLocaleDateString('uk-UA');
-            const currentConfig = configManager.read();
-            const msgPathBase = currentConfig['Listening Path'] || 'messages';
-            const folderPath = path.join(msgPathBase, dateStr);
-            if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
-            fs.writeFileSync(path.join(folderPath, `${msg.message_id}.json`), JSON.stringify(msg, null, 2));
-            console.log(`✅ Voice message saved`);
-        } catch (e) { console.error('⚠️ Save error:', e); }
-
+        saveMessageLocally(data, 'Voice');
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending voice:', error);
