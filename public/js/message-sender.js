@@ -266,32 +266,54 @@ async function handleSendMessage() {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlText;
 
-    // 1. Handle Spoilers
+    // 1. Handle Spoilers (Convert <span class="tg-spoiler"> to <tg-spoiler>)
     tempDiv.querySelectorAll('.tg-spoiler').forEach(el => {
         const spoiler = document.createElement('tg-spoiler');
         spoiler.innerHTML = el.innerHTML;
         el.replaceWith(spoiler);
     });
 
-    // 2. Handle Highlights (Map to Bold or Code?) -> Let's map to BOLD 🖍️
+    // 2. Handle Highlights (Convert to Bold with Emoji 🖍️)
     tempDiv.querySelectorAll('.tg-highlight').forEach(el => {
         const b = document.createElement('b');
-        b.innerHTML = '🖍️ ' + el.innerHTML; // Add emoji to show it was marked
+        b.innerHTML = '🖍️ ' + el.innerHTML;
         el.replaceWith(b);
     });
 
-    // 3. Handle Paragraphs (Quill uses <p>)
-    // Replace <p>Foo</p> with Foo<br>
-    // But be careful with last paragraph.
-    // Easier: Just get innerHTML and do minimal regex cleanup for block tags.
-    // Actually Quill <p> wrap lines.
+    // 3. Unwrap ALL other SPANS (Telegram hates spans) 🚫
+    tempDiv.querySelectorAll('span').forEach(el => {
+        // Just replace with its content
+        el.replaceWith(...el.childNodes);
+    });
 
+    // 4. Clean attributes from standard tags (except A href)
+    const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'a', 'code', 'pre', 'tg-spoiler'];
+    tempDiv.querySelectorAll('*').forEach(el => {
+        const tag = el.tagName.toLowerCase();
+
+        if (!allowedTags.includes(tag) && tag !== 'br' && tag !== 'p') {
+            // Unwrap unknown tags (including divs, spans, font, etc.)
+            el.replaceWith(...el.childNodes);
+        } else {
+            // Remove all attributes except href for <a>
+            if (tag === 'a') {
+                const href = el.getAttribute('href');
+                while (el.attributes.length > 0) el.removeAttribute(el.attributes[0].name);
+                if (href) el.setAttribute('href', href);
+            } else {
+                // Remove all attributes for others
+                while (el.attributes.length > 0) el.removeAttribute(el.attributes[0].name);
+            }
+        }
+    });
+
+    // 5. Final String Cleanup
     let telegramHtml = tempDiv.innerHTML
         .replace(/<p>/g, '')
         .replace(/<\/p>/g, '\n')
         .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
         .replace(/<em>/g, '<i>').replace(/<\/em>/g, '</i>')
-        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>')
+        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>') // Redundant but safe
         .replace(/<pre class="ql-syntax"[^>]*>/g, '<pre>').replace(/<\/pre>/g, '</pre>')
         .replace(/<blockquote>/g, '❝ ').replace(/<\/blockquote>/g, '\n')
         .replace(/<br>/g, '\n')
