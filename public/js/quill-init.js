@@ -81,31 +81,40 @@ function initQuillEditor() {
         // --- Custom Button Handlers (The Correct Way) 🦆 ---
         const toolbar = quill.getModule('toolbar');
 
-        // 1. Spoiler Handler
+        // 1. Spoiler Handler (Fixed Toggle Logic)
         toolbar.addHandler('spoiler', function () {
-            const range = quill.getSelection(true); // 🌿 true = ignore focus check
+            quill.focus(); // Ensure editor has focus
+            const range = quill.getSelection();
             if (range) {
-                const format = quill.getFormat(range);
-                quill.format('spoiler', !format.spoiler);
+                const currentFormat = quill.getFormat(range);
+                // Toggle spoiler: if active -> false, if inactive -> true
+                quill.format('spoiler', !currentFormat.spoiler);
             }
         });
 
-        // 2. Link Handler (Improved & Robust)
+        // 2. Link Handler (Refined Focus)
         toolbar.addHandler('link', function (value) {
             if (value) {
-                const range = quill.getSelection(true); // 🌿 Ignore focus check
+                quill.focus(); // 🌿 Focus FIRST, then get selection
+                const range = quill.getSelection();
+
                 if (range) {
                     const currentFormat = quill.getFormat(range);
                     const defaultValue = currentFormat.link || 'https://';
 
-                    const url = prompt('Введіть посилання (URL):', defaultValue);
-                    quill.focus(); // Restore focus
+                    // Small delay to ensure UI didn't steal focus unexpectedly
+                    setTimeout(() => {
+                        const url = prompt('Введіть посилання (URL):', defaultValue);
+                        quill.focus(); // Restore focus again
 
-                    if (url) {
-                        quill.format('link', url);
-                    } else if (url === '') {
-                        quill.format('link', false);
-                    }
+                        if (url) {
+                            quill.format('link', url);
+                        } else if (url === '') {
+                            quill.format('link', false);
+                        }
+                    }, 10);
+                } else {
+                    alert('Будь ласка, виділіть текст для створення посилання.');
                 }
             } else {
                 quill.format('link', false);
@@ -121,7 +130,7 @@ function initQuillEditor() {
             if (linkBtn && !linkBtn.innerHTML.includes('🔗')) linkBtn.innerHTML = '🔗';
         }, 100);
 
-        console.log('🌿 Quill editor initialized (Link & Focus repaired)');
+        console.log('🌿 Quill editor initialized (Link & Spoiler Logic Updated v10)');
     } catch (e) {
         console.error('Quill init error:', e);
         createFallbackInput();
