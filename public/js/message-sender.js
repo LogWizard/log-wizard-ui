@@ -314,13 +314,52 @@ function initMessageInput() {
 function initStickerPicker() {
     const btn = document.getElementById('stickersBtn');
     const panel = document.getElementById('stickerPicker');
-
     if (!btn || !panel) return;
 
+    // Defined Sticker Sets
+    const stickerSets = [
+        'Brilevsky',
+        'VikostVSpack',
+        'horoshok_k_by_fStikBot',
+        'CystsDribsAssai_by_fStikBot'
+    ];
+    let currentSetIndex = 0;
+    let loadedSets = {}; // Cache
+
+    // UI Elements
+    const container = document.getElementById('stickersContainer');
+
+    // Add Tabs Header if not exists
+    let tabsHeader = panel.querySelector('.sticker-tabs');
+    if (!tabsHeader) {
+        tabsHeader = document.createElement('div');
+        tabsHeader.className = 'sticker-tabs';
+        tabsHeader.style.cssText = 'display: flex; overflow-x: auto; padding: 5px; background: #0e1621; border-bottom: 1px solid #2b5278; gap: 5px; scrollbar-width: none;';
+
+        // Render Tabs
+        stickerSets.forEach((set, index) => {
+            const tab = document.createElement('div');
+            tab.textContent = set.substring(0, 10) + '...'; // Short name
+            tab.title = set;
+            tab.style.cssText = 'padding: 5px 10px; cursor: pointer; font-size: 12px; color: #8b98a7; white-space: nowrap; border-radius: 10px; transition: all 0.2s;';
+            if (index === 0) tab.style.color = '#64b5f6';
+
+            tab.onclick = () => loadStickerSet(index);
+            tabsHeader.appendChild(tab);
+        });
+
+        panel.insertBefore(tabsHeader, container);
+    }
+
+    // Toggle Panel
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isVisible = panel.style.display === 'flex';
         panel.style.display = isVisible ? 'none' : 'flex';
+
+        if (!isVisible && !loadedSets[stickerSets[currentSetIndex]]) {
+            loadStickerSet(currentSetIndex);
+        }
     });
 
     // Close on click outside
@@ -329,6 +368,78 @@ function initStickerPicker() {
             panel.style.display = 'none';
         }
     });
+
+    async function loadStickerSet(index) {
+        currentSetIndex = index;
+        const setName = stickerSets[index];
+
+        // Update Tabs UI
+        Array.from(tabsHeader.children).forEach((tab, i) => {
+            tab.style.color = i === index ? '#64b5f6' : '#8b98a7';
+            tab.style.background = i === index ? 'rgba(100, 181, 246, 0.1)' : 'transparent';
+        });
+
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #8b98a7; padding-top: 50px;">Loading...</div>';
+
+        try {
+            // Check cache (memory)
+            if (loadedSets[setName]) {
+                renderStickers(loadedSets[setName]);
+                return;
+            }
+
+            const res = await fetch(`/api/stickers/${setName}`);
+            const data = await res.json();
+
+            if (data.error) throw new Error(data.error);
+
+            loadedSets[setName] = data.stickers; // Cache it
+            renderStickers(data.stickers);
+
+        } catch (err) {
+            container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding-top: 20px;">Error: ${err.message}</div>`;
+        }
+    }
+
+    function renderStickers(stickers) {
+        container.innerHTML = '';
+        if (!stickers || stickers.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b98a7;">Empty Set</div>';
+            return;
+        }
+
+        stickers.forEach(sticker => {
+            const item = document.createElement('div');
+            item.style.cssText = 'height: 64px; width: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;';
+            item.onmouseover = () => item.style.transform = 'scale(1.1)';
+            item.onmouseout = () => item.style.transform = 'scale(1)';
+
+            const img = document.createElement('img');
+            img.src = `/api/sticker-image/${sticker.file_id}`;
+            img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+            img.loading = 'lazy';
+
+            item.onclick = async () => {
+                // Send Sticker
+                try {
+                    // Visual feedback
+                    item.style.opacity = '0.5';
+                    await sendSticker(null, sticker.file_id);
+                    item.style.opacity = '1';
+                    panel.style.display = 'none'; // Close on send
+
+                    // Add message to UI immediately? (handled by event or reload)
+                    alert(`Sticker sent!`);
+                } catch (e) {
+                    alert('Error sending sticker');
+                    item.style.opacity = '1';
+                }
+            };
+
+            item.appendChild(img);
+            container.appendChild(item);
+        });
+    }
 }
 
 /**

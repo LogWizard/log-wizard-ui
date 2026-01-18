@@ -282,6 +282,67 @@ export function createMessageServer() {
     /* Цей роутер відповідає за обробку запиту /chat */
 
     /* Цей роутер відповідає за обробку всіх інших запитів */
+    // 🌿 Sticker API
+    app.get('/api/stickers/:setName', async (req, res) => {
+        try {
+            const { setName } = req.params;
+            const token = process.env.TG_BOT_TOKEN || process.env.BOT_TOKEN;
+            const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
+
+            // Use global fetch (Node 18+) or dynamic import if needed
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!data.ok) {
+                return res.status(400).json({ error: data.description });
+            }
+            res.json(data.result);
+        } catch (error) {
+            console.error('Sticker Set Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    app.get('/api/sticker-image/:fileId', async (req, res) => {
+        try {
+            const { fileId } = req.params;
+            const token = process.env.TG_BOT_TOKEN || process.env.BOT_TOKEN;
+
+            // 1. Get File Path
+            const pathResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+            const pathData = await pathResp.json();
+
+            if (!pathData.ok || !pathData.result.file_path) {
+                return res.status(404).send('File not found');
+            }
+
+            // 2. Fetch Image Stream
+            const imageUrl = `https://api.telegram.org/file/bot${token}/${pathData.result.file_path}`;
+            const imageResp = await fetch(imageUrl);
+
+            // Pipe to response
+            const ext = path.extname(pathData.result.file_path);
+            let contentType = 'image/webp';
+            if (ext === '.tgs') contentType = 'application/json'; // Lottie
+            if (ext === '.webm') contentType = 'video/webm';
+
+            res.setHeader('Content-Type', contentType);
+            // Cache for 1 hour
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+
+            if (imageResp.body && imageResp.body.pipe) {
+                imageResp.body.pipe(res);
+            } else {
+                const buffer = await imageResp.arrayBuffer();
+                res.send(Buffer.from(buffer));
+            }
+
+        } catch (error) {
+            console.error('Sticker Image Error:', error);
+            res.status(500).send();
+        }
+    });
+
     // 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
     app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
 
