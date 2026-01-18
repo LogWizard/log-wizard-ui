@@ -176,7 +176,7 @@ export function createMessageServer() {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
         const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+        // console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
         if (data['Listening Path']) {
             folderPath = path.join(data['Listening Path'], selectedDate);
@@ -199,7 +199,8 @@ export function createMessageServer() {
             const date = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
             const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
-            console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} GET`);
+            // console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} GET`);
+
 
             const messages = [];
 
@@ -524,7 +525,7 @@ export function createMessageServer() {
         const file_id = await findFileId(obj);
 
         if ((hasSticker || hasPhoto) && !obj.url_sticker && !obj.url_photo) {
-            console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
+            // console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
         }
 
         // Check if we have existing url_* field to refresh
@@ -549,7 +550,7 @@ export function createMessageServer() {
         if (token && file_id) {
             try {
                 const newUrl = await getFileUrl(token, file_id);
-                console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
+                // console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
                 // Determine which url field to set based on message type
                 if (obj.sticker) obj.url_sticker = newUrl;
                 else if (obj.photo) obj.url_photo = newUrl;

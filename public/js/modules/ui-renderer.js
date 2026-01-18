@@ -236,7 +236,7 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
 
     sorted.forEach(msg => appendMessage(msg, container, lastDate, (d) => lastDate = d));
 
-    if (shouldMsgScrollBottom || isAtBottom) {
+    if (shouldMsgScrollBottom || (isAtBottom && !forceClear)) {
         container.scrollTop = container.scrollHeight;
     }
 

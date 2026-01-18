@@ -29,7 +29,7 @@ function init() {
 
     setupEventListeners();
     fetchMessages();
-    setInterval(fetchMessages, 8295);
+    setInterval(fetchMessages, 3000);
 
     if (typeof initMessageInput === 'function') initMessageInput();
 
