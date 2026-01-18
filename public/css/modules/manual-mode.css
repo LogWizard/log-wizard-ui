@@ -1,0 +1,102 @@
+/* ===== MANUAL MODE TOGGLE ===== */
+
+.manual-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8b98a7;
+    min-width: 80px;
+    transition: color 0.2s;
+}
+
+.toggle-label svg {
+    flex-shrink: 0;
+}
+
+.toggle-label.manual {
+    color: #ffa500;
+}
+
+.toggle-label.auto {
+    color: #4ade80;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4ade80;
+    transition: all 0.3s ease;
+    border-radius: 24px;
+}
+
+.toggle-slider::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: all 0.3s ease;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Checked = Manual mode (orange) */
+.toggle-switch input:checked+.toggle-slider {
+    background-color: #ffa500;
+}
+
+.toggle-switch input:checked+.toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* Hover */
+.toggle-switch:hover .toggle-slider {
+    opacity: 0.9;
+}
+
+/* Focus */
+.toggle-switch input:focus+.toggle-slider {
+    box-shadow: 0 0 0 2px rgba(82, 136, 193, 0.3);
+}
+
+/* Manual mode indicator - orange dot */
+.chat-item.manual-mode::after {
+    content: '';
+    position: absolute;
+    right: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    background-color: #ffa500;
+    border-radius: 50%;
+}

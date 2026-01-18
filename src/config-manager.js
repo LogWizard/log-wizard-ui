@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const defaultData = {
     "Listening Port": 3005,
     "Listening Path": path.join(__dirname, '../messages'),
-    "Cors Server Port": 3006,
+    "Cors Server Port": 3004,
     "Date": "01.04.2023",
     "group": "allPrivate"
 };

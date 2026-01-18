@@ -1,0 +1,110 @@
+/* VanillaCalendar Pro Dark Theme - від green-powerfull 🌿 */
+
+.vanilla-calendar {
+    --vc-bg: #181b21;
+    --vc-border: #2b5278;
+    --vc-text-color: #e2e8f0;
+    --vc-text-muted: #64748b;
+    --vc-primary: #5288c1;
+    --vc-primary-hover: rgba(82, 136, 193, 0.15);
+    --vc-today-border: #ffa502;
+    --vc-range-bg: rgba(82, 136, 193, 0.15);
+    --vc-weekend: #ff6b6b;
+
+    background: var(--vc-bg) !important;
+    border: 1px solid var(--vc-border) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    padding: 16px !important;
+    min-width: 300px !important;
+}
+
+.vanilla-calendar-header {
+    padding: 8px 0 16px !important;
+}
+
+.vanilla-calendar-header__content {
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    color: #fff !important;
+}
+
+.vanilla-calendar-arrow {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    color: #64748b !important;
+}
+
+.vanilla-calendar-arrow:hover {
+    background: rgba(82, 136, 193, 0.15) !important;
+    color: #5288c1 !important;
+}
+
+.vanilla-calendar-week__day {
+    color: #64748b !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+}
+
+.vanilla-calendar-day__btn {
+    color: #e2e8f0 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    font-weight: 600 !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    margin: 1px !important;
+    height: 36px !important;
+    width: 36px !important;
+}
+
+.vanilla-calendar-day__btn:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    transform: scale(1.1) !important;
+    z-index: 10;
+}
+
+.vanilla-calendar-day__btn_today {
+    border: 2px solid #ffa502 !important;
+    color: #ffa502 !important;
+    background-color: transparent !important;
+}
+
+/* Selected is solid blue */
+.vanilla-calendar-day__btn_selected {
+    background-color: #5288c1 !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 10px rgba(82, 136, 193, 0.5) !important;
+}
+
+.vanilla-calendar-day__btn_weekend {
+    color: #ff6b6b !important;
+    background-color: rgba(255, 107, 107, 0.05) !important;
+}
+
+.vanilla-calendar-day__btn_intermediate {
+    background: rgba(82, 136, 193, 0.15) !important;
+    color: #5288c1 !important;
+}
+
+.vanilla-calendar-day__btn_prev,
+.vanilla-calendar-day__btn_next {
+    color: #4a5568 !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+    .vanilla-calendar {
+        min-width: 280px !important;
+        max-width: 320px !important;
+        padding: 12px !important;
+    }
+
+    .vanilla-calendar-day__btn {
+        height: 32px !important;
+        width: 32px !important;
+        font-size: 0.85rem !important;
+    }
+}

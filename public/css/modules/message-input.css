@@ -1,0 +1,139 @@
+/* ===== MESSAGE INPUT FIELD 🌿 ===== */
+
+.message-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background-color: #17212b;
+    border-top: 1px solid #2b5278;
+}
+
+.attach-btn,
+.send-btn {
+    background: none;
+    border: none;
+    color: #8b98a7;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.attach-btn:hover,
+.send-btn:hover {
+    background-color: rgba(82, 136, 193, 0.15);
+    color: #5288c1;
+}
+
+.send-btn:active {
+    transform: scale(0.95);
+}
+
+.message-input {
+    flex: 1;
+    background-color: #0e1621;
+    border: 1px solid #2b5278;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.message-input:focus {
+    border-color: #5288c1;
+}
+
+.message-input::placeholder {
+    color: #64748b;
+}
+
+/* Збільшуємо відступ знизу для messages-container */
+.messages-container {
+    padding-bottom: 20px !important;
+}
+
+/* File preview chips */
+.file-preview-container {
+    display: flex;
+    gap: 8px;
+    padding: 8px 20px 0;
+    flex-wrap: wrap;
+}
+
+.file-preview-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(82, 136, 193, 0.15);
+    border: 1px solid rgba(82, 136, 193, 0.3);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    color: #e0e0e0;
+}
+
+.file-preview-chip img {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.file-preview-remove {
+    background: none;
+    border: none;
+    color: #ff6b6b;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    margin-left: 4px;
+}
+
+.file-preview-remove:hover {
+    color: #ff5252;
+}
+
+/* Drag and drop overlay */
+.drag-drop-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(14, 22, 33, 0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.drag-drop-overlay.active {
+    display: flex;
+}
+
+.drag-drop-content {
+    text-align: center;
+    color: #5288c1;
+}
+
+.drag-drop-content svg {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.8;
+}
+
+.drag-drop-content p {
+    font-size: 18px;
+    font-weight: 600;
+}

@@ -7,6 +7,11 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
 import { ConfigManager } from './config-manager.js';
+import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice } from './api/send-message.js';
+import { upload, uploadFile } from './api/upload.js';
+import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
+import { ChatsScanner } from './services/chats-scanner.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appDirectory = path.resolve(__dirname, '..');
@@ -19,6 +24,24 @@ const options = {
 
 const app = express();
 const server = https.createServer(options, app);
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// API Routes 🌿
+app.post('/api/send-message', sendMessage);
+app.post('/api/send-photo', sendPhoto);
+app.post('/api/send-video', sendVideo);
+app.post('/api/send-audio', sendAudio);
+app.post('/api/send-voice', sendVoice);
+app.post('/api/upload', upload.single('file'), uploadFile);
+
+// Manual Mode Routes 🔀
+app.get('/api/get-manual-mode', getManualMode);
+app.post('/api/set-manual-mode', setManualMode);
+app.get('/api/get-all-manual-modes', getAllManualModes);
+
 
 const fileTypes = {
     '.html': 'text/html',
@@ -121,49 +144,83 @@ export function createMessageServer() {
             const group = urlObj.searchParams.get('group');
             const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
             console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} GET`);
-            // console.log(req.socket.remoteAddress);
-            folderPath = path.join(MSG_PATH, date);
-            if (group) {
-                if (group !== 'allPrivate') {
-                    folderPath = path.join(folderPath, group
-                    );
-                }
-            }
-            // console.log(folderPath);
-            fs.accessSync(folderPath, fs.constants.R_OK);
+
             const messages = [];
-            const files = fs.readdirSync(folderPath);
-            for (let file of files) {
-                const filePath = `${folderPath}/${file}`;
-                // check if file has .json extension
-                if (path.extname(file) !== '.json') {
-                    continue;
+
+            // Якщо date пустий - сканувати ВСІ дати
+            let dateFolders = [];
+            if (!date || date === '') {
+                // Отримуємо всі папки-дати
+                const allFolders = fs.readdirSync(MSG_PATH);
+                dateFolders = allFolders.filter(f => {
+                    const fp = path.join(MSG_PATH, f);
+                    return fs.statSync(fp).isDirectory() && /^\d{2}\.\d{2}\.\d{4}$/.test(f);
+                });
+            } else {
+                dateFolders = [date];
+            }
+
+            for (const dateFolder of dateFolders) {
+                let folderPath = path.join(MSG_PATH, dateFolder);
+                if (group && group !== 'allPrivate') {
+                    folderPath = path.join(folderPath, group);
                 }
+
                 try {
-                    const data = fs.readFileSync(filePath);
-                    let message = JSON.parse(data);
-                    message = await urlReplaser(message);
-                    if (sinceParam && message.message_id <= sinceParam) {
+                    fs.accessSync(folderPath, fs.constants.R_OK);
+                } catch {
+                    continue; // Папка не існує - пропускаємо
+                }
+
+                const files = fs.readdirSync(folderPath);
+                for (let file of files) {
+                    const filePath = path.join(folderPath, file);
+                    // check if file has .json extension
+                    if (path.extname(file) !== '.json') {
                         continue;
                     }
-                    const chatMessage = {
-                        user: message.from?.first_name,
-                        text: message.text,
-                        time: new Date(message.date * 1000),
-                    };
 
-                    // add additional properties to chatMessage
-                    const fields = Object.keys(message).filter(
-                        (key) => !['from', 'text', 'date'].includes(key)
-                    );
-                    for (let key of fields) {
-                        chatMessage[key] = message[key];
+                    try {
+                        const stats = fs.statSync(filePath);
+                        if (stats.size === 0) continue; // Пропускаємо пусті файли 🌿
+
+                        const data = fs.readFileSync(filePath);
+                        if (!data || data.length === 0) continue; // Skip empty/corrupted files
+
+                        let message = JSON.parse(data);
+                        message = await urlReplaser(message);
+                        if (sinceParam && message.message_id <= sinceParam) {
+                            continue;
+                        }
+
+                        // 🌿 Filter by chat.id for private chats (group param without '-')
+                        if (group && group !== 'allPrivate' && !group.includes('-')) {
+                            const msgChatId = String(message.chat?.id || message.from?.id || '');
+                            if (msgChatId !== group) {
+                                continue; // Skip messages not belonging to this chat
+                            }
+                        }
+
+                        const chatMessage = {
+                            user: message.from?.first_name,
+                            text: message.text,
+                            time: new Date(message.date * 1000),
+                        };
+
+                        // add additional properties to chatMessage
+                        const fields = Object.keys(message).filter(
+                            (key) => !['text', 'date'].includes(key)
+                        );
+                        for (let key of fields) {
+                            chatMessage[key] = message[key];
+                        }
+                        messages.push(chatMessage);
+                    } catch (error) {
+                        // Silently skip corrupted/broken files 🌿
+                        continue;
                     }
-                    messages.push(chatMessage);
-                } catch (error) {
-                    console.error(`Error parsing/reading file ${filePath}: ${error}`);
                 }
-            }
+            } // end for dateFolder
 
             messages.sort((a, b) => b.time - a.time);
 
@@ -174,6 +231,31 @@ export function createMessageServer() {
         }
     });
     /* Цей роутер відповідає за get запитів /message */
+
+    // 🌿 ALL CHATS API
+    // Scanner initialized below
+
+    app.get('/api/get-all-chats', async (req, res) => {
+        // Dynamic import or use global class
+        // Since we cannot use import inside function effectively without dynamic import()
+        // We will assume ChatsScanner is imported at top
+
+        // Initialize scanner if not exists (using current MSG_PATH)
+        // We can attach it to app or global scope
+        const scanner = new ChatsScanner(MSG_PATH);
+
+        const force = req.query.force === 'true';
+        if (force) {
+            const chats = await scanner.scan();
+            res.json(Object.values(chats));
+        } else {
+            let chats = scanner.getCached();
+            if (Object.keys(chats).length === 0) {
+                chats = await scanner.scan();
+            }
+            res.json(Object.values(chats));
+        }
+    });
 
     /* Цей роутер відповідає за обробку запиту /chat */
     app.get('/chat', async (req, res) => {

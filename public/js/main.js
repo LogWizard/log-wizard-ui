@@ -1,402 +1,223 @@
+import { state, setState, loadState } from './modules/state.js';
+import { fetchMessages, loadPreviousDateMessages, setSettingsToServer } from './modules/api.js';
+import { renderChatListView, renderChatMessages, renderTimelineView, showEmptyMessagesState } from './modules/ui-renderer.js';
+import { formatDate } from './modules/utils.js';
 
-const chatMessages = document.getElementById("chat-messages");
+// ========== Telegram-Style Chat Interface 🌿🦆 ==========
+
 emojione.ascii = true;
-let title = $('#historyDate');
-function addChatMessage(message) {
-    const messageElement = document.createElement("li");
-    messageElement.classList.add("shoutbox-content");
-    // Встановлюємо флаг, чи відображати поля для спойлеру
-    let showChat = false;
-    // додаємо всі властивості об’єкта
-    for (const prop in message) {
-        // якщо це одне з вибраних полів, пропускаємо його
-        if (['user', 'text', 'time', 'message_id', 'aiAnswer'].includes(prop)) {
-            continue;
-        }
-        const value = typeof message[prop] === "object"
-            ? JSON.stringify(message[prop], null, 2)
-            : String(message[prop]).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-        if (typeof message[prop] === "object") {
-            messageElement.innerHTML += `<details ${showChat && ''}> <summary>${prop}</summary>`;
-            const nestedObject = message[prop];
-            for (const nProp in nestedObject) {
-                const nestedValue = nestedObject[nProp];
-                const valueToPrint = typeof nestedValue === "object"
-                    ? JSON.stringify(nestedValue, null, 2)
-                    : String(nestedValue).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                messageElement.innerHTML += `
-                &emsp;&emsp;<b>${nProp}</b>: ${valueToPrint}<br>
-            `;
-            }
-            messageElement.innerHTML += '</details>';
-            showChat = true;
-        } else {
-            messageElement.innerHTML += `<p><b>${prop}</b>: ${value}</p>`;
-        }
-    }
-    let onceMedia = '';
-    const user = typeof message.user === "string" ? message.user : '';
-    const text = typeof message.text === "string" ? message.text : '';
-    const time = new Date(message.time).toLocaleString() || '';
-    let musicName = '';
-    if (message.audio) {
-        if (message.audio.performer !== undefined && message.audio.title !== undefined) {
-            musicName = `${message.audio.performer} — ${message.audio.title}`;
-        } else {
-            musicName = message.audio.file_name.replace(/\.mp3|\.ogg/gi, '');
-        }
-    }
-    const photo = message.url_photo ? `<img class="photo" src="${message.url_photo}" width="650" height="auto">` : '';
-    const sticker = message.url_sticker ? `<img class="sticker" src="${message.url_sticker}" width="196" height="196">` : '';
-    const video_note = message.url_video_note ? `<div id="circular-progress-${message.message_id}" class="circular-progress">
-    <video class="video_note" id="video_note-${message.message_id}" autoplay muted>
-        <source
-            src="${message.url_video_note}"
-            type="video/mp4" />
-    </video>
-    <span id="progress-value-${message.message_id}" onclick="document.querySelector('#video_note-${message.message_id}').click()" class="progress-value"></span>
-</div>` : '';
-    const voice = message.url_voice ? `<div class="audio-player">
-    <button class="play-pause-button">${message.voice.duration}s.</button>
-    <div class="progress-bar-container">
-      <div class="progress"></div>
-    </div>
-    <audio src="${message.url_voice}"></audio>
-  </div>` : '';
-    const music = message.url_audio ? `<div id="audio-player">
-  <h2>${musicName}</h2>
-  <audio src="${message.url_audio}" id="audio"></audio>
-  <div id="controls">
-    <button id="play-button">Грати#?</button>
-    <div id="timeline-container">
-      <div id="timeline"></div>
-      <div id="current-time"></div>
-    </div>
-  </div>
-</div>`: '';
-    const video = message.url_video ? `<div class="video-player">
-                                        <video src="${message.url_video}" controls></video>
-                                    </div>`: '';
-    const animated_sticker = message.url_animated_sticker ? `<tgs-player style='width: auto;height: 220px;' autoplay=true loop=true mode='normal' src='http://localhost:3002/${message.url_animated_sticker}' ></tgs-player>` : '';
-    const animation = message.url_animation ? `<div class="animation">
-    <video class="animation" src="${message.url_animation}"  autoplay loop></video>
-</div>`: '';
-    if (photo) {
-        onceMedia = photo;
-    } else if (sticker) {
-        onceMedia = sticker;
-    } else if (video_note) {
-        onceMedia = video_note;
-    } else if (voice) {
-        onceMedia = voice;
-    } else if (video) {
-        onceMedia = video;
-    } else if (animated_sticker) {
-        onceMedia = animated_sticker;
-    } else if (animation) {
-        onceMedia = animation;
-    } else if (music) {
-        onceMedia = music;
+// Initialize
+init();
 
-    }
-    messageElement.innerHTML = `
-<span class="shoutbox-username"><b>${user}</b></span>
-<br>
-<span class="shoutbox-comment-reply">${text.replace("\n", "<br>")}</span>
-<br>
-${onceMedia}
-<br>
-${message.aiAnswer ? `<span style="color:#ff8000;"><b>AI Answer:</b><br> ${message.aiAnswer.replaceAll("\n", "<br>")}</span><br><br>` : ''}
+function init() {
+    initUIRefs();
 
-<details ${showChat && ''}>
-    <summary>(Spoiler) JSON:</summary><pre><code class="language-json">${JSON.stringify(message, null, 2)}</code></pre>
-    
-</details>
-<span class="shoutbox-comment-ago"><b>${time}</b></span>
-`;
-    messageElement.classList.add("shoutbox-content");
-    if (latestMessageId !== 0) {
-        chatMessages.insertBefore(messageElement, chatMessages.firstChild);
+    // Load Cache first for instant feel 🌿
+    if (loadState()) {
+        renderChatListView();
+        if (state.selectedChatId) renderChatMessages(state.selectedChatId);
+    }
+
+    setupEventListeners();
+    fetchMessages();
+    setInterval(fetchMessages, 8295);
+
+    if (typeof initMessageInput === 'function') initMessageInput();
+
+    // Scroll To Bottom Button
+    const btn = document.getElementById('scrollToBottomBtn');
+    if (state.ui.messagesContainer && btn) {
+        state.ui.messagesContainer.addEventListener('scroll', () => {
+            const isScrolledUp = state.ui.messagesContainer.scrollTop < (state.ui.messagesContainer.scrollHeight - state.ui.messagesContainer.clientHeight - 300);
+            if (isScrolledUp) btn.classList.add('visible');
+            else btn.classList.remove('visible');
+        });
+        btn.addEventListener('click', () => {
+            state.ui.messagesContainer.scrollTo({ top: state.ui.messagesContainer.scrollHeight, behavior: 'smooth' });
+        });
+    }
+
+    if (state.ui.manualModeToggle) {
+        state.ui.manualModeToggle.addEventListener('change', window.handleManualModeToggle);
+    }
+}
+
+function initUIRefs() {
+    state.ui.chatList = document.getElementById('chat-list');
+    state.ui.messagesContainer = document.getElementById('messages-container');
+    state.ui.activeChatName = document.getElementById('activeChatName');
+    state.ui.activeChatStatus = document.getElementById('activeChatStatus');
+    state.ui.chatViewBtn = document.getElementById('chatViewBtn');
+    state.ui.timelineViewBtn = document.getElementById('timelineViewBtn');
+    state.ui.statsViewBtn = document.getElementById('statsViewBtn');
+    state.ui.chatSearchInput = document.getElementById('chatSearch');
+    state.ui.calendarToggle = document.getElementById('calendarToggle');
+    state.ui.calendarPopup = document.getElementById('calendarPopup');
+    state.ui.manualModeToggle = document.getElementById('manualModeToggle');
+    state.ui.toggleLabel = document.getElementById('toggleLabel');
+}
+
+function setupEventListeners() {
+    // Mobile Back
+    const backBtn = document.getElementById('mobileBackBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            document.body.classList.remove('mobile-chat-active');
+            setState('selectedChatId', null);
+        });
+    }
+
+    // Views
+    state.ui.chatViewBtn.addEventListener('click', () => switchView('chat'));
+    state.ui.timelineViewBtn.addEventListener('click', () => switchView('timeline'));
+    state.ui.statsViewBtn.addEventListener('click', () => switchView('stats'));
+
+    // Search
+    if (state.ui.chatSearchInput) {
+        state.ui.chatSearchInput.addEventListener('input', (e) => {
+            setState('chatSearchQuery', e.target.value.toLowerCase());
+            renderChatListView();
+        });
+    }
+
+    // Calendar
+    if (state.ui.calendarToggle && state.ui.calendarPopup) {
+        initCalendar();
+    }
+
+    // Infinite Scroll
+    state.ui.messagesContainer.addEventListener('scroll', handleInfiniteScroll);
+
+    // Settings Dialog (Legacy jQuery)
+    // Settings Dialog (Legacy jQuery)
+    // Use local function reference (hoisted)
+    $(document).on('click', '#settings-btn', openSettings);
+    initSettingsDialog();
+}
+
+function switchView(view) {
+    setState('currentView', view);
+    if (view === 'chat') {
+        state.ui.chatViewBtn.classList.add('active');
+        state.ui.timelineViewBtn.classList.remove('active');
+        if (state.ui.manualModeToggle) state.ui.manualModeToggle.style.display = 'inline-block';
+        if (state.ui.toggleLabel) state.ui.toggleLabel.style.display = 'inline-block';
+        renderChatListView();
+        if (!state.selectedChatId) document.body.classList.remove('mobile-chat-active');
     } else {
-        chatMessages.appendChild(messageElement);
+        state.ui.chatViewBtn.classList.remove('active');
+        state.ui.timelineViewBtn.classList.add('active');
+        if (state.ui.manualModeToggle) state.ui.manualModeToggle.style.display = 'none';
+        if (state.ui.toggleLabel) state.ui.toggleLabel.style.display = 'none';
+        document.body.classList.add('mobile-chat-active');
+
+        // Spinner
+        state.ui.messagesContainer.innerHTML = `
+            <div class="loading-spinner-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888;">
+                <div class="spinner" style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                <div class="loading-text">Завантажую Timeline... 🌿</div>
+            </div>
+            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        `;
+
+        // Force reset fetch logic to "refresh" timeline
+        // Maybe we just call fetchMessages?
+        fetchMessages();
     }
-}
-// Отримання даних про повідомлення з сервера
-let statusFunc = false;
-let latestMessageId = 0;
-let selectedUserDate = $('#selectDate').val() ? $('#selectDate').val() : new Date();
-async function fetchMessages() {
-    const serverRespon = await getSettingsFromServer();
-    selectedUserDate = serverRespon.Date ? serverRespon.Date : new Date();
-    groupAfterSelection = serverRespon.group ? serverRespon.group : 'allPrivate';
-    const response = await fetch(`/messages?since=${latestMessageId}&date=${selectedUserDate}&group=${groupAfterSelection ? groupAfterSelection : 'allPrivate'}`);
-    if (!response.ok) {
-        console.error("Не вдалось отримати список повідомлень");
-        return;
-    }
-    const messages = await response.json();
-    if (messages.length === 0) {
-        messages.forEach(addChatMessage);
-    }
-    if (messages.length > 0) {
-        latestMessageId = messages[0].message_id;
-        messages.reverse();
-        messages.forEach(addChatMessage);
-    }
-    title.html(`<button id="settings-btn" class="settings-btn">Settings</button><span style="cursor:pointer;" id="dateLabel">Selected: ${selectedUserDate}</span>`);
-    $('#dateLabel').text(`Selected: ${selectedUserDate}`);
-    await injectVoicePlayer(statusFunc);
-    injectMusicPlayer(statusFunc);
-    Prism.highlightAll('pre.language-json'); //розкрашування json
-}
-/* Для того щоб навіть пізніше додані елементи могли викликати функцію */
-async function getSettingsFromServer() {
-    let response = [];
-    await fetch('/api/v1/getSettings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-        .then(response => response.json())
-        .then(data => {
-            response = data;
-        }).catch(error => console.error(error));
-    return response;
-}
-async function setSettingsFromServer(data) {
-    await fetch('/api/v1/setSettings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    }).then(response => response.json()).then(data => {
-        $('#listeningPort').val(data['Listening Port']);
-        $('#listeningPath').val(data['Listening Path']);
-        $('#corsServerPort').val(data['Cors Server Port']);
-    }).catch(error => console.error(error));
 }
 
-let groupAfterSelection = '';
-$(document).ready(function () {
-    $(document).on('change', '#groupsSelect', function () {
-        groupAfterSelection = $(this).val();
-    });
+function handleInfiniteScroll() {
+    if (state.ui.messagesContainer.scrollTop < 200 && !state.isLoadingHistory) {
+        // Logic to determine if we load per chat or timeline is slightly handled inside loadPreviousDateMessages via state.currentView, 
+        // BUT we need to make sure we have a selected chat if in chat mode.
+        if (state.currentView === 'chat' && !state.selectedChatId) return;
+        loadPreviousDateMessages();
+    }
+}
 
-    $('#selectDateWidget').datepicker({
-        dateFormat: 'dd.mm.yy',
-        onSelect: function (dateText) {
-            selectedUserDate = dateText;
-            const data = {
-                'Date': dateText
-            };
-            setSettingsFromServer(data);
-            $('#chat-messages').empty();
-            latestMessageId = 0;
-            fetchMessages();
+function initCalendar() {
+    // Basic setup from original code
+    const calendar = new VanillaCalendar(state.ui.calendarPopup, {
+        settings: { lang: 'uk', iso8601: false },
+        actions: {
+            clickDay(e, dates) {
+                if (dates[0]) {
+                    setState('selectedDate', dates[0]);
+                    const badge = document.getElementById('selectedDateBadge');
+                    const text = document.getElementById('selectedDateText');
+                    if (text) text.textContent = `📅 ${dates[0]}`;
+                    if (badge) badge.style.display = 'flex';
+                    calendar.hide();
+                    state.ui.calendarPopup.style.display = 'none';
+
+                    // Reset
+                    setState('allMessages', []);
+                    setState('latestMessageId', 0);
+                    setState('allDatesLoaded', []);
+                    setSettingsToServer({ 'Date': dates[0] });
+                    fetchMessages();
+                }
+            }
         }
     });
-    $(document).on('click', '#dateLabel', function () {
-        if ($('#selectDateWidget').is(':visible')) {
-            $('#selectDateWidget').datepicker('hide');
+    calendar.init();
+
+    state.ui.calendarToggle.addEventListener('click', () => {
+        if (state.ui.calendarPopup.style.display === 'none') {
+            state.ui.calendarPopup.style.display = 'block';
+            calendar.show();
         } else {
-            console.log('Клік на #dateLabel');
-            $('#selectDateWidget').datepicker('show');
+            state.ui.calendarPopup.style.display = 'none';
+            calendar.hide();
         }
     });
 
-    $(document).on('click', '.settings-btn', async function () {
-        const data = await getSettingsFromServer();
-        const groups = data.groups;
-        $('#dialog').css("display", "block");
-        let options = "";
-        if (groups) {
-            groups.forEach((group) => {
-                options += `<option value="${group}">${group}</option>`;
-            });
-            //<label for="selectGroupChat">Select chat:</label>
-            const selectTemplate = `
-    <select id="groupsSelect" class="js-example-basic-single" name="state">
-    <option value="" >Chuse option</option>
-    <option value="allPrivate" >All Private Message</option>
-      ${options}
-    </select>`;
+    // Clear Filter
+    const clearBtn = document.getElementById('clearDateFilter');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            setState('selectedDate', null);
+            const badge = document.getElementById('selectedDateBadge');
+            if (badge) badge.style.display = 'none';
+            setState('allMessages', []);
+            setState('latestMessageId', 0);
+            setState('allDatesLoaded', []);
+            setSettingsToServer({ 'Date': '' });
+            fetchMessages();
+        });
+    }
+}
 
-            $("#groupsSelect").replaceWith(selectTemplate);
-            $('#groupsSelect').select2({
-                width: '100%',
-                style: "display:block;",
-                minimumResultsForSearch: -1,
-                theme: 'grey'
-            });
-            $('#groupsSelectLabel').css({ "display": "block" });
-        }
-
-        //  
-        $('#listeningPort').val(data['Listening Port']);
-        $('#listeningPath').val(data['Listening Path']);
-        $('#corsServerPort').val(data['Cors Server Port']);
-        const dateParts = data['Date'].split('.');
-        const formattedDate = `${dateParts[2]}-${(Number(dateParts[1])).toString().padStart(2, "0")}-${(Number(dateParts[0])).toString().padStart(2, "0")}`;
-        $('#selectDate').val(formattedDate);
-        $("#dialog").dialog("open");
-    });
-    $(function () {
+function initSettingsDialog() {
+    // Legacy jQuery dialog
+    if (window.$ && window.$.fn.dialog) {
         $("#dialog").dialog({
-            autoOpen: false,
-            width: "40%",
-            modal: true,
-            closeText: "X",
+            autoOpen: false, width: "40%", modal: true, closeText: "X",
             buttons: {
                 "Save": async function () {
-                    // Send values to server
                     const data = {
                         'Listening Port': $('#listeningPort').val(),
                         'Listening Path': $('#listeningPath').val(),
                         'Cors Server Port': $('#corsServerPort').val(),
-                        'Date': formatDate($('#selectDate').val()),
-                        'group': groupAfterSelection
+                        'Date': formatDate($('#selectDate').val())
                     };
-                    await setSettingsFromServer(data);
+                    await setSettingsToServer(data);
                     $(this).dialog("close");
-                    // location.reload();
-                    $('#chat-messages').empty();
-                    latestMessageId = 0;
+                    setState('allMessages', []);
+                    setState('latestMessageId', 0);
                     await fetchMessages();
                 },
-                Cancel: function () {
-                    $(this).dialog("close");
-                }
+                Cancel: function () { $(this).dialog("close"); }
             }
         });
-    });
-    /* settings button event listening */
-
-    /* Фунція для йобаного кружечка togle */
-    $(document).on('click', 'video', function () {
-        startProgressBar(this.id);
-        if (this.paused) {
-            this.play();
-            this.muted = false;
-            this.currentTime = 0;
-            this.loop = false;
-            console.log("1");
-            return;
-        }
-        if (this.play && this.muted) {
-            console.log("2");
-            this.currentTime = 0;
-            this.muted = false;
-            return;
-        }
-        if (this.play && !this.muted) {
-            console.log("3");
-            this.pause();
-            return;
-        }
-    });
-});
-/* Фунція для йобаного кружечка togle */
-
-/* Фунція для відображення прогресу йобаного кружечка */
-function startProgressBar(video_noteId) {
-    const id = video_noteId.replace("video_note-", "");
-    const video = document.querySelector(`#video_note-${id}`);
-    const circularProgress = document.querySelector(`#circular-progress-${id}`);
-    const progressValue = document.querySelector(`#progress-value-${id}`);
-    const progressEndValue = 100;
-    const speed = 5;
-    function updateProgress() {
-        const currentPosition = (video.currentTime / video.duration) * 100;
-        const degrees = currentPosition * 3.8;
-        // progressValue.textContent = `${currentPosition.toFixed()}%`;
-        //progressValue.textContent = `${video.currentTime.toFixed(1)}/${video.duration.toFixed(1)}`;
-        circularProgress.style.background = `conic-gradient(#7d2ae8 ${degrees}deg, #ededed 0deg)`;
-        const progressElement = circularProgress.querySelector('.progress');
-        //progressElement.style.transform = `rotate(${degrees}deg)`;
-        if (currentPosition >= progressEndValue) {
-            clearInterval(progress);
-            progressValue.textContent = '';
-        }
-    }
-    const progress = setInterval(updateProgress, speed);
-}
-/* Фунція для відображення прогресу йобаного кружечка */
-
-
-
-/* Music */
-function injectMusicPlayer(funcStatus) {
-    if (funcStatus) {
-        return;
-    }
-
-    const audioPlayers = document.querySelectorAll("#audio-player");
-    const playButtons = document.querySelectorAll("#play-button");
-
-    for (let i = 0; i < audioPlayers.length; i++) {
-        const audioPlayer = audioPlayers[i];
-        const playButton = playButtons[i];
-        const audio = audioPlayer.querySelector("audio");
-        const timeline = audioPlayer.querySelector(
-            "#timeline > .progress-bar"
-        );
-        const currentTimeEl = audioPlayer.querySelector("#current-time");
-
-        playButton.addEventListener("click", () => {
-            if (audio.paused || audio.ended) {
-                audio.play();
-                playButton.textContent = "Не Грати#?";
-            } else {
-                audio.pause();
-                playButton.textContent = "Грати#?";
-            }
-        });
-
-        audio.addEventListener("timeupdate", () => {
-            const duration = audio.duration;
-            const currentTimeValue = audio.currentTime;
-            const progress = (currentTimeValue / duration) * 100;
-
-            timeline.style.width = `${progress}%`;
-            currentTimeEl.textContent = `${formatTime(
-                currentTimeValue
-            )} / ${formatTime(duration)}`;
-        });
     }
 }
 
-function formatTime(seconds) {
-    const min = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60).toFixed(0).padStart(2, "0");
-    return `${min}:${sec}`;
-}
+// Global Wrappers (exposed for HTML inline handlers)
+window.openSettings = openSettings;
+window.switchView = switchView;
 
-/* Music */
-
-fetchMessages();
-setInterval(fetchMessages, 8295);
-
-
-
-function formatDate(date, time = false, tHour = false) {
-    let d = new Date(date);
-
-    if (isNaN(d)) {
-        return date;
-    }
-
-    const day = d.getDate().toString().padStart(2, '0'); // 01
-    const month = (d.getMonth() + 1).toString().padStart(2, '0'); // 04
-    const year = d.getFullYear(); // 2023
-
-    if (tHour) {
-        return `${d.toLocaleTimeString('uk-UA', { hour12: false })}`;
-    } else if (time) {
-        return `${day}.${month}.${year} ${d.toLocaleTimeString('uk-UA')}`;
-    } else {
-        return `${day}.${month}.${year}`;
-    }
+function openSettings() {
+    if (window.$ && window.$.fn.dialog) $("#dialog").dialog("open");
 }

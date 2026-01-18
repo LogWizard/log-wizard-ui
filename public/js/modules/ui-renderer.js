@@ -1,0 +1,551 @@
+import { state } from './state.js';
+import { fetchMessages, fetchMessagesForDate, fetchSingleChatUpdate } from './api.js';
+import { safeParseDate, isToday as checkIsToday } from './utils.js';
+
+let lastRenderedChatId = null;
+let renderedMessageIds = new Set();
+
+// 🌿 Expose globally for Prism/Audio injections to find
+window.renderChatMessages = renderChatMessages;
+window.renderChatListView = renderChatListView;
+
+export function showEmptyMessagesState() {
+    const container = state.ui.messagesContainer;
+    container.innerHTML = `
+        <div class="no-chat-selected">
+            <div class="chat-icon">💬</div>
+            <div class="no-chat-text">Select a chat to view messages</div>
+        </div>
+    `;
+}
+
+export function renderChatListView() {
+    const list = state.ui.chatList;
+    const sortedChats = Object.values(state.chatGroups).sort((a, b) => {
+        return safeParseDate(b.lastMessage.time) - safeParseDate(a.lastMessage.time);
+    });
+
+    const query = state.chatSearchQuery;
+    const filteredChats = query
+        ? sortedChats.filter(chat => chat.name.toLowerCase().includes(query))
+        : sortedChats;
+
+    if (filteredChats.length === 0) {
+        if (list.children.length === 0 || !list.querySelector('.empty-state')) {
+            const emptyText = query ? `Нічого не знайдено для "${query}"` : 'No messages';
+            list.innerHTML = `<div class="empty-state" style="padding: 40px 20px;"><div class="empty-state-text">${emptyText}</div></div>`;
+            showEmptyMessagesState();
+        }
+        return;
+    }
+
+    // Remove stale empty state
+    const emptyState = list.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
+
+    // Incremental List Update
+    filteredChats.forEach((chat, index) => {
+        let chatItem = list.querySelector(`.chat-item[data-chat-id="${chat.id}"]`);
+        if (chatItem) updateChatListItem(chatItem, chat);
+        else {
+            chatItem = createChatListItem(chat);
+            list.appendChild(chatItem);
+        }
+
+        // Reordering
+        const currentAtIndex = list.children[index];
+        if (currentAtIndex && currentAtIndex !== chatItem) {
+            list.insertBefore(chatItem, currentAtIndex);
+        } else if (!currentAtIndex) {
+            list.appendChild(chatItem);
+        }
+    });
+
+    // Cleanup
+    const validIds = new Set(filteredChats.map(c => c.id));
+    Array.from(list.children).forEach(child => {
+        if (child.dataset.chatId && !validIds.has(child.dataset.chatId)) child.remove();
+    });
+}
+
+function updateChatListItem(div, chat) {
+    if (chat.id === state.selectedChatId) {
+        if (!div.classList.contains('active')) div.classList.add('active');
+    } else {
+        div.classList.remove('active');
+    }
+
+    const lastMsg = chat.lastMessage;
+    if (!lastMsg) return;
+
+    let timeStr = '';
+    if (lastMsg.time) {
+        const time = safeParseDate(lastMsg.time);
+        const day = time.getDate().toString().padStart(2, '0');
+        const month = (time.getMonth() + 1).toString().padStart(2, '0');
+        const isToday = checkIsToday(time);
+
+        timeStr = isToday
+            ? time.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })
+            : `${day}.${month}`;
+    }
+
+    let preview = lastMsg.text || '';
+    if (lastMsg.aiAnswer) preview = '🦆 ' + lastMsg.aiAnswer;
+    else if (lastMsg.url_photo) preview = '📷 Фото';
+    else if (lastMsg.url_voice) preview = '🎤 Голосове';
+    else if (lastMsg.url_video) preview = '🎥 Відео';
+    else if (lastMsg.url_video_note) preview = '⭕ Кружок';
+    else if (lastMsg.url_location) preview = '📍 Локація';
+
+    const nameEl = div.querySelector('.chat-item-name');
+    if (nameEl && nameEl.textContent !== chat.name) nameEl.textContent = chat.name;
+
+    const timeEl = div.querySelector('.chat-item-time');
+    if (timeEl && timeEl.textContent !== timeStr) timeEl.textContent = timeStr;
+
+    const previewEl = div.querySelector('.chat-item-preview');
+    const previewText = `${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}`;
+    if (previewEl && previewEl.textContent !== previewText) previewEl.textContent = previewText;
+}
+
+function createChatListItem(chat) {
+    const div = document.createElement('div');
+    div.className = 'chat-item';
+    if (chat.id === state.selectedChatId) div.classList.add('active');
+
+    const lastMsg = chat.lastMessage;
+    let timeStr = '';
+    if (lastMsg.time) {
+        const time = safeParseDate(lastMsg.time);
+        const day = time.getDate().toString().padStart(2, '0');
+        const month = (time.getMonth() + 1).toString().padStart(2, '0');
+        const isToday = checkIsToday(time);
+
+        timeStr = isToday
+            ? time.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })
+            : `${day}.${month}`;
+    }
+
+    let preview = lastMsg.text || '';
+    if (lastMsg.aiAnswer) preview = '🦆 ' + lastMsg.aiAnswer;
+    else if (lastMsg.url_photo) preview = '📷 Фото';
+    else if (lastMsg.url_voice) preview = '🎤 Голосове';
+    else if (lastMsg.url_video) preview = '🎥 Відео';
+    else if (lastMsg.url_video_note) preview = '⭕ Кружок';
+    else if (lastMsg.url_location) preview = '📍 Локація';
+
+    div.innerHTML = `
+        <div class="chat-item-avatar">
+            ${chat.lastMessage.user_avatar_url
+            ? `<img src="${chat.lastMessage.user_avatar_url}" alt="${chat.name}" loading="lazy">`
+            : `<div class="avatar-placeholder">${(chat.name || 'U').charAt(0).toUpperCase()}</div>`
+        }
+        </div>
+        <div class="chat-item-content">
+            <div class="chat-item-header">
+                <div class="chat-item-name">${chat.name}</div>
+                <div class="chat-item-time">${timeStr}</div>
+            </div>
+            <div class="chat-item-preview">${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}</div>
+        </div>
+    `;
+
+    div.dataset.chatId = chat.id;
+    div.addEventListener('click', () => selectChat(chat.id));
+    return div;
+}
+
+export async function selectChat(chatId) {
+    // 🌿 Auto-switch to chat view if we are on timeline or other views
+    if (state.currentView !== 'chat') {
+        if (typeof window.switchView === 'function') {
+            window.switchView('chat');
+        } else {
+            console.warn('switchView global not found');
+        }
+    }
+
+    state.selectedChatId = chatId;
+    window.selectedChatId = chatId;
+
+    // Manual State Logic
+    if (typeof loadManualModeState === 'function') loadManualModeState(chatId);
+
+    // Update UI active class
+    const list = state.ui.chatList;
+    if (list) {
+        Array.from(list.children).forEach(item => item.classList.remove('active'));
+        const item = list.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+        if (item) item.classList.add('active');
+    }
+
+    // 🌿 Messenger-like lazy load (Fetch recent context)
+    let chat = state.chatGroups[chatId];
+    if (chat && chat.messages.length === 0) {
+        if (state.ui.activeChatStatus) state.ui.activeChatStatus.textContent = 'Завантажую історію... 🌿';
+        // Always try to fetch current context for this chat
+        await fetchSingleChatUpdate(chatId);
+        chat = state.chatGroups[chatId]; // refresh
+    }
+
+    if (chat) {
+        if (state.ui.activeChatName) state.ui.activeChatName.textContent = chat.name;
+        if (state.ui.activeChatStatus) state.ui.activeChatStatus.textContent = `${chat.messages.length} messages`;
+        renderChatMessages(chatId);
+    }
+
+    document.body.classList.add('mobile-chat-active');
+}
+
+export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceClear = false) {
+    if (!chatId) return;
+    const chat = state.chatGroups[chatId];
+    if (!chat) return;
+    const container = state.ui.messagesContainer;
+
+    if (lastRenderedChatId !== chatId || forceClear) {
+        container.innerHTML = '';
+        renderedMessageIds.clear();
+        lastRenderedChatId = chatId;
+    }
+
+    const prevScrollTop = container.scrollTop;
+    const prevScrollHeight = container.scrollHeight;
+    const isAtBottom = (prevScrollHeight - prevScrollTop) <= (container.clientHeight + 150);
+
+    let lastDate = null;
+    const existingSeparators = container.querySelectorAll('.date-badge');
+    if (existingSeparators.length > 0) lastDate = existingSeparators[existingSeparators.length - 1].textContent;
+
+    const sorted = chat.messages.sort((a, b) => safeParseDate(a.time) - safeParseDate(b.time));
+
+    sorted.forEach(msg => appendMessage(msg, container, lastDate, (d) => lastDate = d));
+
+    if (shouldMsgScrollBottom || isAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
+
+    injectPlugins();
+}
+
+export function renderTimelineView(forceClear = false) {
+    // Reset specific chat state
+    state.selectedChatId = null;
+    const container = state.ui.messagesContainer;
+
+    if (state.ui.activeChatName) state.ui.activeChatName.textContent = 'Timeline View';
+    if (state.ui.activeChatStatus) state.ui.activeChatStatus.textContent = `${state.allMessages.length} total messages`;
+
+    if (lastRenderedChatId !== 'timeline' || forceClear) {
+        container.innerHTML = '';
+        renderedMessageIds.clear();
+        lastRenderedChatId = 'timeline';
+    }
+
+    const spinner = container.querySelector('.loading-spinner-container');
+
+    if (state.allMessages.length > 0 && spinner) spinner.remove();
+    else if (state.allMessages.length === 0 && !spinner) {
+        showEmptyMessagesState();
+        return;
+    }
+
+    // Capture scrolling for smart update
+    const prevScrollTop = container.scrollTop;
+    const prevScrollHeight = container.scrollHeight;
+    const isAtBottom = (prevScrollHeight - prevScrollTop) <= (container.clientHeight + 150);
+
+    let lastDate = null;
+    const existingSeparators = container.querySelectorAll('.date-badge');
+    if (existingSeparators.length > 0) lastDate = existingSeparators[existingSeparators.length - 1].textContent;
+
+    const sorted = state.allMessages.sort((a, b) => safeParseDate(a.time) - safeParseDate(b.time));
+    sorted.forEach(msg => appendMessage(msg, container, lastDate, (d) => lastDate = d));
+
+    if (spinner || isAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
+
+    injectPlugins();
+}
+
+function appendMessage(msg, container, lastDate, setLastDate) {
+    const mid = msg.message_id?.toString();
+    if (renderedMessageIds.has(mid)) return;
+
+    const msgDate = safeParseDate(msg.time).toLocaleDateString('uk-UA');
+    if (msgDate !== lastDate) {
+        const separator = document.createElement('div');
+        separator.className = 'message-date-separator';
+        separator.innerHTML = `<span class="date-badge">${msgDate}</span>`;
+        container.appendChild(separator);
+        setLastDate(msgDate);
+    }
+
+    const isBot = msg.from?.is_bot || msg.from?.id === 'bot' || (typeof msg.user === 'string' && msg.user.includes('Bot'));
+    const type = isBot ? 'bot' : 'client';
+
+    const bubble = createMessageBubble(msg, type);
+    container.appendChild(bubble);
+    renderedMessageIds.add(mid);
+
+    if (msg.aiAnswer) {
+        const aiId = mid + '_ai';
+        if (!renderedMessageIds.has(aiId)) {
+            const botMsg = { ...msg, text: msg.aiAnswer, from: { first_name: 'Gys Bot 🦆', id: 'bot' }, isBot: true };
+            const botBubble = createMessageBubble(botMsg, 'bot');
+            botBubble.classList.add('ai-response');
+            container.appendChild(botBubble);
+            renderedMessageIds.add(aiId);
+        }
+    }
+}
+
+function createMessageBubble(msg, type) {
+    console.log('DEBUG: Rendering message:', msg);
+    const div = document.createElement('div');
+    div.className = `message-bubble ${type}`;
+
+    const time = safeParseDate(msg.time);
+    const timeStr = time.getTime() === 0 ? '' : time.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+
+    let mediaHtml = '';
+
+    // 📷 Photo (Improved detection)
+    const photoSrc = msg.url_photo || msg.photo_url || (Array.isArray(msg.photo) ? msg.photo[msg.photo.length - 1].url : (msg.photo?.url || msg.photo));
+    if (photoSrc && typeof photoSrc === 'string') {
+        mediaHtml += `<div class="message-photo message-media"><img src="${photoSrc}" loading="lazy" onclick="expandImage(this.src)"></div>`;
+    }
+
+    // 🎥 Video
+    const videoSrc = msg.url_video || msg.video_url || msg.video?.url || (typeof msg.video === 'string' ? msg.video : null);
+    if (videoSrc) {
+        mediaHtml += `<div class="message-video message-media"><video src="${videoSrc}" controls loading="lazy"></video></div>`;
+    }
+
+    // ⭕ Video Note (Circular)
+    const vNoteSrc = msg.url_video_note || msg.video_note?.url || (typeof msg.video_note === 'string' ? msg.video_note : null);
+    if (vNoteSrc) {
+        mediaHtml += `
+            <div class="message-media circular-progress">
+                <video class="video_note" src="${vNoteSrc}" autoplay loop muted playsinline onclick="this.paused ? this.play() : this.pause()"></video>
+            </div>
+        `;
+    }
+
+    // 🎤 Voice / Audio
+    const voiceSrc = msg.url_voice || msg.voice_url || msg.voice?.url || msg.audio?.url || (typeof msg.voice === 'string' ? msg.voice : null) || (typeof msg.audio === 'string' ? msg.audio : null);
+    if (voiceSrc) {
+        mediaHtml += `
+            <div class="audio-player message-media">
+                <audio src="${voiceSrc}"></audio>
+                <button class="play-pause-button">▶</button>
+                <div class="progress-bar-container">
+                    <div class="progress" style="width: 0%"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 🎨 Sticker (static and animated)
+    const stickerSrc = msg.url_sticker || msg.url_animated_sticker || msg.sticker?.url || (typeof msg.sticker === 'string' ? msg.sticker : null);
+    if (stickerSrc) {
+        // Check if it's animated (TGS or WEBM)
+        if (stickerSrc.includes('.tgs') || msg.sticker?.is_animated) {
+            // TGS Lottie sticker - use tgs-player (requires CORS proxy)
+            mediaHtml += `<div class="message-sticker message-media animated-sticker"><tgs-player src="${stickerSrc}" autoplay loop mode="normal" class="sticker-tgs"></tgs-player></div>`;
+        } else if (stickerSrc.includes('.webm') || msg.sticker?.is_video) {
+            // WEBM video sticker
+            mediaHtml += `<div class="message-sticker message-media"><video src="${stickerSrc}" class="sticker" autoplay loop muted playsinline></video></div>`;
+        } else {
+            // Static sticker (WebP/PNG)
+            mediaHtml += `<div class="message-sticker message-media"><img src="${stickerSrc}" class="sticker" loading="lazy"></div>`;
+        }
+    }
+
+    // 🎬 Animation (GIF)
+    const animSrc = msg.url_animation || msg.animation?.url || (typeof msg.animation === 'string' ? msg.animation : null);
+    if (animSrc) {
+        mediaHtml += `<div class="message-animation message-media"><video src="${animSrc}" class="animation" autoplay loop muted playsinline></video></div>`;
+    }
+
+    // 📎 Document
+    const docSrc = msg.url_document || msg.document?.url || (typeof msg.document === 'string' ? msg.document : null);
+    if (docSrc) {
+        const fileName = msg.document?.file_name || 'Файл 📎';
+        mediaHtml += `
+            <div class="message-document message-media">
+                <a href="${docSrc}" target="_blank" class="document-link">
+                    <div class="document-icon">📎</div>
+                    <div class="document-info">
+                        <div class="document-name">${fileName}</div>
+                    </div>
+                </a>
+            </div>
+        `;
+    }
+
+    // 📍 Location (R.I.P. Yandex 🌿)
+    const lat = msg.latitude || msg.location?.latitude;
+    const lon = msg.longitude || msg.location?.longitude;
+    if (lat && lon) {
+        // Use a generic beautiful location placeholder instead of Yandex
+        const mapPlaceholder = `https://via.placeholder.com/600x400/2b5278/ffffff?text=📍+Location+at+${lat},${lon}`;
+        mediaHtml += `
+            <div class="location-message message-media">
+                <div class="location-card" onclick="window.open('https://www.google.com/maps?q=${lat},${lon}', '_blank')">
+                    <div class="location-map-stub" style="background: #17212b; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #2b5278;">
+                         <div style="font-size: 40px; margin-bottom: 10px;">📍</div>
+                         <div style="color: #5288c1; font-weight: 600;">Відкрити в Google Maps</div>
+                         <div style="font-size: 11px; opacity: 0.6; margin-top: 4px;">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 📊 Poll
+    if (msg.poll || msg.quiz) {
+        const poll = msg.poll || msg.quiz;
+        const totalVotes = poll.total_voter_count || (poll.options || []).reduce((sum, opt) => sum + (opt.voter_count || 0), 0) || 1;
+        const optionsHtml = (poll.options || []).map(opt => {
+            const percent = Math.round(((opt.voter_count || 0) / totalVotes) * 100);
+            return `
+                <div class="poll-option">
+                    <div class="poll-option-bar" style="width: ${percent}%"></div>
+                    <span class="poll-option-text">${opt.text}</span>
+                    <span class="poll-option-percent">${percent}%</span>
+                </div>
+            `;
+        }).join('');
+        mediaHtml += `
+            <div class="poll-message message-media">
+                <div class="poll-question">📊 ${poll.question}</div>
+                <div class="poll-options">${optionsHtml}</div>
+                <div class="poll-footer">${totalVotes} голосів</div>
+            </div>
+        `;
+    }
+
+    // 📋 Task List
+    if (msg.task_list || msg.tasks) {
+        const tasks = msg.task_list || msg.tasks;
+        const itemsHtml = Array.isArray(tasks)
+            ? tasks.map(t => `<div class="task-item">▫️ ${t.text || t}</div>`).join('')
+            : `<div class="task-item">▫️ ${tasks}</div>`;
+        mediaHtml += `
+            <div class="task-list-message message-media">
+                <div class="task-header">📋 Список задач</div>
+                <div class="task-items">${itemsHtml}</div>
+            </div>
+        `;
+    }
+
+    // 👤 Contact
+    if (msg.contact) {
+        const fullName = `${msg.contact.first_name || ''} ${msg.contact.last_name || ''}`.trim() || 'Контакт';
+        const phone = msg.contact.phone_number || '';
+        mediaHtml += `
+            <div class="contact-message message-media">
+                <div class="contact-icon">👤</div>
+                <div class="contact-info">
+                    <div class="contact-name">${fullName}</div>
+                    <div class="contact-phone">${phone}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 🎲 Dice
+    if (msg.dice) {
+        mediaHtml += `
+            <div class="dice-message message-media">
+                <span class="dice-emoji" style="font-size: 48px;">${msg.dice.emoji}</span>
+                <span class="dice-value" style="font-size: 24px; font-weight: bold; margin-left: 10px;">${msg.dice.value}</span>
+            </div>
+        `;
+    }
+
+    // 📍 Venue
+    if (msg.venue) {
+        const mapUrl = msg.url_location || `https://www.google.com/maps?q=${msg.venue.latitude},${msg.venue.longitude}`;
+        mediaHtml += `
+            <div class="venue-message message-media" onclick="window.open('${mapUrl}', '_blank')" style="cursor: pointer;">
+                <div class="venue-icon">📍</div>
+                <div class="venue-info">
+                    <div class="venue-title" style="font-weight: 600; color: #5288c1;">${msg.venue.title || 'Venue'}</div>
+                    <div class="venue-address" style="font-size: 12px; opacity: 0.7;">${msg.venue.address || ''}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Formatting text (preserve line breaks and basic HTML)
+    let formattedText = (msg.text || msg.caption || '').replace(/\n/g, '<br>');
+    if (window.emojione) {
+        formattedText = window.emojione.toImage(formattedText);
+    }
+
+
+    // Determine sender name and label
+    let senderNameHtm = '';
+    if (msg.isBot || type === 'bot') {
+        senderNameHtm = '<span class="ai-label">Gys Bot 🦆</span>';
+    } else {
+        const name = `${msg.from?.first_name || ''} ${msg.from?.last_name || ''}`.trim() || msg.user || 'Unknown';
+        if (name) senderNameHtm = `<div class="message-sender" style="color: #5288c1; font-weight: 600; font-size: 13px; margin-bottom: 4px;">${name}</div>`;
+    }
+
+    div.innerHTML = `
+        <div class="bubble-content">
+            ${senderNameHtm}
+            ${mediaHtml}
+            ${formattedText ? `<div class="message-text">${formattedText}</div>` : ''}
+            <div class="message-footer">
+                <span class="message-time">${timeStr}</span>
+            </div>
+        </div>
+    `;
+    return div;
+}
+
+function injectPlugins() {
+    if (typeof injectVoicePlayer === 'function') injectVoicePlayer();
+    if (typeof injectMusicPlayer === 'function') injectMusicPlayer();
+    if (window.Prism) window.Prism.highlightAll();
+}
+
+// 🌿 Global UI Actions (Restored)
+window.expandImage = function (src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'image-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    overlay.innerHTML = `<img src="${src}" style="max-width:90%;max-height:90%;border-radius:8px;">`;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+};
+
+window.insertFormatting = function (tag) {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const text = input.value;
+    let insertion = '';
+
+    switch (tag) {
+        case 'bold': insertion = `<b>${text.substring(start, end) || 'bold'}</b>`; break;
+        case 'italic': insertion = `<i>${text.substring(start, end) || 'italic'}</i>`; break;
+        case 'code': insertion = `<code>${text.substring(start, end) || 'code'}</code>`; break;
+        case 'pre': insertion = `<pre>${text.substring(start, end) || 'pre'}</pre>`; break;
+        case 'link': insertion = `<a href="">${text.substring(start, end) || 'link'}</a>`; break;
+        case 'spoiler': insertion = `<span class="tg-spoiler">${text.substring(start, end) || 'spoiler'}</span>`; break;
+    }
+    input.value = text.substring(0, start) + insertion + text.substring(end);
+    input.focus();
+};
+
+window.handleManualModeToggle = function (e) {
+    console.log('Manual mode toggled:', e.target.checked);
+};

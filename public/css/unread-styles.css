@@ -1,0 +1,33 @@
+/* ===== Допов нення до styles-dark.css 🌿 ===== */
+
+/* Зменшений час повідомлення */
+.message-time {
+    font-size: 10px !important;
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+}
+
+/* Непрочитані чати */
+.chat-item.unread {
+    background-color: #1e2a38 !important;
+}
+
+.chat-item.unread .chat-item-name {
+    font-weight: 700 !important;
+}
+
+.chat-item.unread .chat-item-preview {
+    color: #a3b1c6 !important;
+    font-weight: 500 !important;
+}
+
+.chat-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #5288c1 0%, #3a6ba5 100%);
+    z-index: 1;
+}
