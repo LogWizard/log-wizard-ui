@@ -300,7 +300,148 @@ function initMessageInput() {
 
     // Paste from Clipboard 🌿
     initPasteHandler();
+
+    // Init Recording 🌿
+    initRecordingHandlers();
 }
+
+/**
+ * Initialize Recording Handlers (Audio/Video) 🌿
+ */
+function initRecordingHandlers() {
+    const recordAudioBtn = document.getElementById('recordAudioBtn');
+    const recordVideoBtn = document.getElementById('recordVideoBtn');
+    const overlay = document.getElementById('recordingOverlay');
+    const stopBtn = document.getElementById('stopRecordingBtn');
+    const cancelBtn = document.getElementById('cancelRecordingBtn');
+    const timerEl = document.getElementById('recordingTimer');
+    const previewVideo = document.getElementById('recordingPreview');
+    const previewContainer = document.getElementById('videoPreviewContainer');
+    const audioVisualizer = document.getElementById('audioVisualizer');
+
+    let mediaRecorder = null;
+    let chunks = [];
+    let recordStartTime = 0;
+    let timerInterval = null;
+    let stream = null;
+    let recordingType = null; // 'audio' or 'video'
+
+    if (!recordAudioBtn || !recordVideoBtn) return;
+
+    async function startRecording(type) {
+        recordingType = type;
+        chunks = [];
+        try {
+            const constraints = type === 'video'
+                ? { video: { aspectRatio: 1, facingMode: 'user' }, audio: true }
+                : { audio: true };
+
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            if (type === 'video') {
+                previewVideo.srcObject = stream;
+                previewContainer.style.display = 'block';
+                audioVisualizer.style.display = 'none';
+            } else {
+                previewContainer.style.display = 'none';
+                audioVisualizer.style.display = 'block';
+            }
+
+            overlay.style.display = 'flex';
+
+            const mimeType = type === 'video' ? 'video/webm;codecs=vp8,opus' : 'audio/webm;codecs=opus';
+            // Fallback for Safari/others if needed, but Chrome supports webm
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                // Stop tracks
+                stream.getTracks().forEach(track => track.stop());
+                clearInterval(timerInterval);
+                overlay.style.display = 'none';
+
+                if (chunks.length === 0) return; // Cancelled
+
+                const blob = new Blob(chunks, { type: mimeType });
+                const ext = type === 'video' ? 'webm' : 'webm'; // Browser records webm usually
+                const filename = `recording_${Date.now()}.${ext}`;
+                const file = new File([blob], filename, { type: blob.type });
+
+                // Auto Send Flow
+                await handleRecordedFile(file, type);
+            };
+
+            mediaRecorder.start();
+            recordStartTime = Date.now();
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+
+        } catch (err) {
+            console.error('Error starting recording:', err);
+            alert('Cannot access microphone/camera: ' + err.message);
+            overlay.style.display = 'none';
+        }
+    }
+
+    function updateTimer() {
+        const diff = Math.floor((Date.now() - recordStartTime) / 1000);
+        const m = Math.floor(diff / 60).toString().padStart(2, '0');
+        const s = (diff % 60).toString().padStart(2, '0');
+        timerEl.textContent = `${m}:${s}`;
+    }
+
+    function stopRecording(send = true) {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            if (!send) chunks = []; // Clear chunks if cancelled
+            mediaRecorder.stop();
+        } else {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            overlay.style.display = 'none';
+            clearInterval(timerInterval);
+        }
+    }
+
+    async function handleRecordedFile(file, type) {
+        try {
+            console.log(`🎤 Uploading recorded ${type}...`);
+            const url = await uploadFile(file);
+
+            // Set as pending attachment
+            pendingAttachment = {
+                url: url,
+                type: file.type,
+                file: file,
+                isRecordedNote: true // 🌿 Flag to force Note Mode send
+            };
+
+            // Force Toggle visually for user feedback (optional but good)
+            const toggle = document.getElementById('videoNoteToggle');
+            if (toggle) {
+                toggle.checked = true;
+                toggle.dispatchEvent(new Event('change'));
+            }
+
+            // Immediately Send
+            await handleSendMessage();
+
+            // Reset toggle if it wasn't on before? Nah, keep it.
+
+        } catch (error) {
+            alert('Error sending recording: ' + error.message);
+        }
+    }
+
+    recordAudioBtn.addEventListener('click', () => startRecording('audio'));
+    recordVideoBtn.addEventListener('click', () => startRecording('video'));
+
+    stopBtn.addEventListener('click', () => stopRecording(true));
+    cancelBtn.addEventListener('click', () => stopRecording(false));
+}
+
 
 /**
  * Handle send message - підтримка Quill WYSIWYG 🌿
@@ -417,7 +558,9 @@ async function handleSendMessage() {
             // Send attachment with caption
             let response;
             const isWebm = attachmentToSend.url.endsWith('.webm') || attachmentToSend.type.includes('webm');
-            const isNoteMode = document.getElementById('videoNoteToggle')?.checked; // 🌿 Acts as "Note Mode" for both Video and Audio
+
+            // 🌿 Note Mode is Active IF Toggle is ON OR File was Recorded Live
+            const isNoteMode = document.getElementById('videoNoteToggle')?.checked || attachmentToSend.isRecordedNote;
 
             if (isWebm) {
                 // 🌿 Auto-send .webm as Sticker

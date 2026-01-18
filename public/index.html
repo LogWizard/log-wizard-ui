@@ -265,7 +265,7 @@
                 </div>
 
                 <div class="message-input-wrapper" style="border-top: none; border-radius: 0 0 20px 20px;">
-                    <button id="attachBtn" class="attach-btn" title="Прикріпити файл">
+                    <button id="attachBtn" class="attach-btn" title="Attach File">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path
@@ -273,9 +273,27 @@
                             </path>
                         </svg>
                     </button>
+                    <!-- Media Recording Buttons 🌿 -->
+                    <button id="recordAudioBtn" class="attach-btn" title="Record Voice">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                    </button>
+                    <button id="recordVideoBtn" class="attach-btn" title="Record Video Circle">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+
                     <!-- Quill Editor Container -->
                     <div id="quillEditor" class="message-input-quill" style="border: none; border-radius: 0;"></div>
-                    <button id="sendBtn" class="send-btn" title="Відправити (Enter)">
+                    <button id="sendBtn" class="send-btn" title="Send (Enter)">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -287,15 +305,78 @@
         </div>
     </div>
 
+    <!-- Recording Overlay 🌿 -->
+    <div id="recordingOverlay"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000; flex-direction: column; align-items: center; justify-content: center;">
+        <div id="videoPreviewContainer"
+            style="display: none; width: 320px; height: 320px; border-radius: 50%; overflow: hidden; border: 4px solid #64b5f6; margin-bottom: 30px; box-shadow: 0 0 20px rgba(100, 181, 246, 0.4); background: #000;">
+            <video id="recordingPreview" autoplay muted playsinline
+                style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+        </div>
+        <div id="audioVisualizer"
+            style="display: none; margin-bottom: 30px; font-size: 60px; color: #64b5f6; animation: pulse 1.5s infinite;">
+            🎤
+        </div>
+        <div id="recordingTimer"
+            style="color: white; font-size: 32px; font-family: monospace; font-weight: bold; margin-bottom: 40px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+            00:00</div>
+
+        <div style="display: flex; gap: 30px;">
+            <button id="cancelRecordingBtn"
+                style="padding: 12px 30px; border-radius: 30px; border: 2px solid #ef4444; color: #ef4444; background: transparent; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.2s;">
+                CANCEL
+            </button>
+            <button id="stopRecordingBtn"
+                style="padding: 12px 30px; border-radius: 30px; background: #ef4444; color: white; border: none; cursor: pointer; font-size: 16px; font-weight: bold; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); transition: all 0.2s;">
+                STOP & SEND
+            </button>
+        </div>
+    </div>
+
+    <style>
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        #cancelRecordingBtn:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        #stopRecordingBtn:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+    </style>
+    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+    </svg>
+    </button>
+    </div>
+    </div>
+    </div>
+    </div>
+
     <input style="display: none;" type="date" name="selectDateWidget" id="selectDateWidget"
         class="text ui-widget-content ui-corner-all">
 
-    <!-- Core Scripts (Global & Modules) with Cache Busting v14 🌿 -->
-    <script src="/js/message-sender.js?v=14"></script>
+    <!-- Core Scripts (Global & Modules) with Cache Busting v15 🌿 -->
+    <script src="/js/message-sender.js?v=15"></script>
     <script src="/js/audio-player.js"></script>
     <!-- Prism already in head -->
     <script src="/js/quill-init.js?v=13"></script>
-    <script type="module" src="/js/main.js?v=14"></script>
+    <script type="module" src="/js/main.js?v=15"></script>
 </body>
 
 </html>
