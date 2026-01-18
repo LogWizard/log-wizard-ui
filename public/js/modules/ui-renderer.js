@@ -564,9 +564,14 @@ function createMessageBubble(msg, type) {
                             if (avatarEl) {
                                 avatarEl.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
                             }
+                        } else {
+                            // 200 OK but no URL (server suppressed 404) 🌿
+                            if (!window.failedAvatars) window.failedAvatars = new Set();
+                            window.failedAvatars.add(currentUserId);
+                            reportAvatarErrors();
                         }
                     } else {
-                        // Silent fail, collect stats
+                        // Real network error or 500
                         if (!window.failedAvatars) window.failedAvatars = new Set();
                         window.failedAvatars.add(currentUserId);
                         reportAvatarErrors();

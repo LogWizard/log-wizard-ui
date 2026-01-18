@@ -74,7 +74,8 @@ app.get('/api/get-user-photo', async (req, res) => {
                 return res.json({ url: photoUrl });
             }
         }
-        res.status(404).send('No photo found');
+        // 🌿 Return 200 OK with null url to prevent browser console 404 spam
+        res.status(200).json({ url: null, message: 'No public photo found' });
     } catch (e) {
         console.error('Error fetching user photo:', e);
         res.status(500).send(e.message);
