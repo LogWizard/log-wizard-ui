@@ -309,6 +309,7 @@ async function handleSendMessage() {
 
     // 5. Final String Cleanup
     let telegramHtml = tempDiv.innerHTML
+        .replace(/&nbsp;/g, ' ') // 🌿 Fix NBSP rendering issue
         .replace(/<p>/g, '')
         .replace(/<\/p>/g, '\n')
         .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
