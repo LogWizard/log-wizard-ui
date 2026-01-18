@@ -107,6 +107,16 @@ function updateChatListItem(div, chat) {
     const previewEl = div.querySelector('.chat-item-preview');
     const previewText = `${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}`;
     if (previewEl && previewEl.textContent !== previewText) previewEl.textContent = previewText;
+
+    // 🌿 Update Avatar from Cache if available
+    const userId = !chat.id.startsWith('-') ? chat.id : null;
+    if (userId && window.userAvatarCache?.has(userId)) {
+        const avatarContainer = div.querySelector('.chat-item-avatar');
+        // Check if we already have an image
+        if (avatarContainer && !avatarContainer.querySelector('img')) {
+            avatarContainer.innerHTML = `<img src="${window.userAvatarCache.get(userId)}" class="chat-list-avatar" data-user-id="${userId}" alt="${chat.name}" loading="lazy">`;
+        }
+    }
 }
 
 function createChatListItem(chat) {
@@ -137,10 +147,24 @@ function createChatListItem(chat) {
 
     div.innerHTML = `
         <div class="chat-item-avatar">
-            ${chat.lastMessage.user_avatar_url
-            ? `<img src="${chat.lastMessage.user_avatar_url}" alt="${chat.name}" loading="lazy">`
-            : `<div class="avatar-placeholder">${(chat.name || 'U').charAt(0).toUpperCase()}</div>`
-        }
+            ${(() => {
+            const userId = !chat.id.startsWith('-') ? chat.id : null;
+            if (userId && window.userAvatarCache?.has(userId)) {
+                return `<img src="${window.userAvatarCache.get(userId)}" class="chat-list-avatar" data-user-id="${userId}" alt="${chat.name}" loading="lazy">`;
+            }
+            // Trigger load if missing
+            if (userId && window.pendingAvatarRequests && !window.pendingAvatarRequests.has(userId) && (!window.failedAvatars || !window.failedAvatars.has(userId))) {
+                // Reuse the loader logic or create a helper? For now, simple fetch trigger
+                // We can't easily wait here, so we rely on the global cache update to refresh 'updateChatListItem' later?
+                // Or just trigger self-update via observer. 
+                // Simplest: Request caching. The next 'updateChatListItem' will pick it up or we add a specific updater.
+                // Let's call a minimal helper function to trigger load.
+                requestAvatarLoad(userId);
+            }
+            return chat.lastMessage.user_avatar_url
+                ? `<img src="${chat.lastMessage.user_avatar_url}" class="chat-list-avatar" alt="${chat.name}" loading="lazy">`
+                : `<div class="avatar-placeholder chat-list-avatar" data-user-id="${userId || ''}">${(chat.name || 'U').charAt(0).toUpperCase()}</div>`;
+        })()}
         </div>
         <div class="chat-item-content">
             <div class="chat-item-header">
@@ -580,52 +604,9 @@ function createMessageBubble(msg, type) {
         `;
 
         // Async load avatar with deduplication & caching 🌿💎
+        // Async load avatar with deduplication & caching 🌿💎
         if (userId) {
-            // Initialize cache if needed
-            if (!window.userAvatarCache) window.userAvatarCache = new Map();
-            if (!window.pendingAvatarRequests) window.pendingAvatarRequests = new Set(); // Prevent duplicate in-flight requests
-
-            // Check if we already have the URL
-            if (window.userAvatarCache.has(userId)) {
-                const cachedUrl = window.userAvatarCache.get(userId);
-                // Directly inject into HTML if possible, but regex replace on string is messy.
-                // We'll trust the DOM update logic below or update immediately after render.
-                // Actually, let's update the regex approach or just wait for next render? 
-                // Better: Update the HTML string in place before returning.
-                /* 
-                   Replacing the placeholder content in avatarHtml logic is tricky because we construct it above.
-                   Instead, we set a small script or rely on the data-user-id to update it immediately after append?
-                   No, 'createMessageBubble' returns a node. We can manipulate 'div' before return.
-                */
-                // We will update the element immediately after creation (at end of function)
-            } else {
-                // Request load if not pending
-                if (!window.pendingAvatarRequests.has(userId) && (!window.failedAvatars || !window.failedAvatars.has(userId))) {
-                    window.pendingAvatarRequests.add(userId);
-
-                    fetch(`/api/get-user-photo?user_id=${userId}`)
-                        .then(res => res.ok ? res.json() : null)
-                        .then(data => {
-                            if (data && data.url) {
-                                window.userAvatarCache.set(userId, data.url);
-                                // Live update all existing avatars for this user
-                                document.querySelectorAll(`.message-avatar[data-user-id="${userId}"]`).forEach(el => {
-                                    el.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
-                                });
-                            } else {
-                                if (!window.failedAvatars) window.failedAvatars = new Set();
-                                window.failedAvatars.add(userId);
-                            }
-                        })
-                        .catch(() => {
-                            if (!window.failedAvatars) window.failedAvatars = new Set();
-                            window.failedAvatars.add(userId);
-                        })
-                        .finally(() => {
-                            window.pendingAvatarRequests.delete(userId);
-                        });
-                }
-            }
+            requestAvatarLoad(userId);
         }
     }
 
@@ -884,4 +865,59 @@ function updateHeaderAvatar(chat) {
             } catch (e) { /* Silent fail */ }
         }, 0);
     }
+}
+
+// 🌿 Centralized Avatar Loader Helper
+function requestAvatarLoad(userId) {
+    if (!userId) return;
+
+    // Initialize caches
+    if (!window.userAvatarCache) window.userAvatarCache = new Map();
+    if (!window.pendingAvatarRequests) window.pendingAvatarRequests = new Set();
+    if (!window.failedAvatars) window.failedAvatars = new Set();
+
+    // Check fast paths
+    if (window.userAvatarCache.has(userId)) return; // Already cached
+    if (window.pendingAvatarRequests.has(userId)) return; // Already loading
+    if (window.failedAvatars.has(userId)) return; // Already failed
+
+    window.pendingAvatarRequests.add(userId);
+
+    fetch(`/api/get-user-photo?user_id=${userId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+            if (data && data.url) {
+                window.userAvatarCache.set(userId, data.url);
+                // Live update
+
+                // 1. Message Bubbles
+                document.querySelectorAll(`.message-avatar[data-user-id="${userId}"]`).forEach(el => {
+                    el.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                });
+
+                // 2. Chat List Avatars
+                document.querySelectorAll(`.chat-list-avatar[data-user-id="${userId}"]`).forEach(el => {
+                    if (el.tagName !== 'IMG') {
+                        const img = document.createElement('img');
+                        img.src = data.url;
+                        img.className = 'chat-list-avatar';
+                        img.setAttribute('data-user-id', userId);
+                        img.setAttribute('alt', 'Avatar');
+                        img.loading = 'lazy';
+                        el.replaceWith(img);
+                    } else if (el.src !== data.url) {
+                        el.src = data.url;
+                    }
+                });
+            } else {
+                window.failedAvatars.add(userId);
+            }
+        })
+        .catch(err => {
+            console.warn(`Failed to load avatar for ${userId}:`, err);
+            window.failedAvatars.add(userId);
+        })
+        .finally(() => {
+            window.pendingAvatarRequests.delete(userId);
+        });
 }
