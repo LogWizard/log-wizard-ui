@@ -282,7 +282,13 @@ export function createMessageServer() {
     /* Цей роутер відповідає за обробку запиту /chat */
 
     /* Цей роутер відповідає за обробку всіх інших запитів */
-    app.get(/^\/(css|fonts|js|uploads)\//i, (req, res) => {
+    // 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
+    app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
+
+    // 🌿 Static Files (Assets)
+    app.use(express.static(path.join(appDirectory, 'public')));
+
+    app.get(/^\/(css|fonts|js)\//i, (req, res) => {
         // Use req.path to ignore query parameters like ?v=2 🌿
         const filePath = path.join(appDirectory, 'public', req.path);
         const fileExtension = path.extname(filePath);

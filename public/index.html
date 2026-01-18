@@ -199,11 +199,36 @@
                     <button class="ql-spoiler" title="Spoiler">👁️</button>
                     <!-- Spacer -->
                     <div style="flex: 1;"></div>
-                    <!-- Video Note Toggle 🌿 -->
-                    <label class="manual-mode-switch" title="Send as Video Note (Circle)" style="margin-right: 15px;">
-                        <input type="checkbox" id="videoNoteToggle">
-                        <span class="label-text" style="font-size: 18px; line-height: 1;">⭕</span>
+                    <!-- Note Mode Toggle 🌿 -->
+                    <label class="manual-mode-switch" title="Send as Note (Circle Video / Voice)"
+                        style="margin-right: 15px; cursor: pointer;">
+                        <input type="checkbox" id="videoNoteToggle" style="display: none;">
+                        <span class="icon-state"
+                            style="display: flex; align-items: center; color: #5a6b7c; transition: all 0.3s;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="4" class="inner-circle"></circle>
+                            </svg>
+                        </span>
                     </label>
+                    <script>
+                        // Visual feedback for Note Toggle
+                        document.getElementById('videoNoteToggle')?.addEventListener('change', function () {
+                            const icon = this.nextElementSibling;
+                            const inner = icon.querySelector('.inner-circle');
+
+                            if (this.checked) {
+                                icon.style.color = '#64b5f6'; // Active Blue
+                                icon.style.filter = 'drop-shadow(0 0 5px rgba(100, 181, 246, 0.5))';
+                                inner.style.fill = 'currentColor';
+                            } else {
+                                icon.style.color = '#5a6b7c'; // Inactive Gray
+                                icon.style.filter = 'none';
+                                inner.style.fill = 'none';
+                            }
+                        });
+                    </script>
 
                     <!-- Manual Mode Toggle -->
                     <label class="manual-mode-switch" title="Manual Mode (AI OFF)">
