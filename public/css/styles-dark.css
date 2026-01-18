@@ -1211,3 +1211,42 @@ body {
     object-fit: cover;
 }
 
+
+/* Fix Reactions visibility on Stickers */
+.message-bubble.sticker-only .message-reactions {
+    margin-top: 5px !important;
+    background: rgba(23, 33, 43, 0.8) !important; /* Dark background */
+    border-radius: 12px;
+    padding: 4px 8px !important;
+    display: inline-flex !important;
+    flex-wrap: wrap;
+    gap: 4px;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
+    max-width: 100%;
+}
+
+.message-bubble.sticker-only .reaction-chip {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #fff !important;
+}
+
+/* Ensure sticker bubble content allows overflow for reactions */
+.message-bubble.sticker-only .bubble-content {
+    overflow: visible !important;
+}
+
+/* Fix Mobile Layout Issues (Bottom overlap) */
+@media (max-width: 768px) {
+    .chat-input-panel {
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+    }
+    
+    /* Ensure chat list doesn't get covered by bottom bars */
+    .chat-list-panel {
+        padding-bottom: 60px; 
+    }
+}
+
