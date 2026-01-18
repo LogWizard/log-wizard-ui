@@ -508,26 +508,71 @@ function createMessageBubble(msg, type) {
 
     // 💬 Reactions HTML 🌿
     let reactionsHtml = '';
-    // Telegram format: msg.reactions = { results: [{ type: { emoji: "👍" }, total_count: 1 }] }
-    // Or simple array: [{ emoji: "👍", count: 1 }]
+    // Telegram format / Simple array / Local Update format
     const reactionsList = msg.reactions?.results || (Array.isArray(msg.reactions) ? msg.reactions : []);
+
     if (reactionsList.length > 0) {
         const reactionItems = reactionsList.map(r => {
-            // Handle Telegram format: r.type.emoji OR simple r.emoji
             const emoji = r.type?.emoji || r.emoji || '❤️';
             const count = r.total_count || r.count || 1;
-            return `<span class="reaction-chip" style="display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; background: rgba(100, 181, 246, 0.15); border-radius: 12px; font-size: 13px; margin-right: 4px;">${emoji}${count > 1 ? `<span style="font-size: 11px; color: #8b98a7;">${count}</span>` : ''}</span>`;
+            const isOwn = r.is_own || false; // Check local flag
+            const bgStyle = isOwn ? 'background: rgba(100, 181, 246, 0.3); border: 1px solid rgba(100, 181, 246, 0.5);' : 'background: rgba(255, 255, 255, 0.08);';
+
+            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 14px; font-size: 14px; margin-right: 4px; ${bgStyle} cursor: pointer;">${emoji}${count > 1 ? `<span style="font-size: 12px; opacity: 0.8;">${count}</span>` : ''}</span>`;
         }).join('');
-        reactionsHtml = `<div class="message-reactions" style="margin-top: 4px;">${reactionItems}</div>`;
+        reactionsHtml = `<div class="message-reactions" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">${reactionItems}</div>`;
     }
 
     // Reaction button (add reaction) 🌿
     const msgId = msg.message_id;
     const chatId = msg.chat?.id || window.selectedChatId;
-    const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0.5; margin-left: 6px; font-size: 12px;" title="Add Reaction">😊</span>`;
+    const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0.6; margin-left: 8px; font-size: 14px; transition: opacity 0.2s;" title="Add Reaction" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">😊</span>`;
+
+    // 👤 Avatar HTML 🌿
+    let avatarHtml = '';
+    if (type !== 'bot' && !msg.isBot) {
+        // Use placeholder initially, load async
+        const userId = msg.from?.id;
+        const userInitials = name ? name[0] : '?';
+        const colorIndex = (userId || 0) % 7;
+        const colors = ['#e17076', '#eda86c', '#a695e7', '#6ec9cb', '#65aadd', '#ee7aae', '#6bc18e']; // Telegram colors
+        const userColor = colors[colorIndex];
+
+        avatarHtml = `
+            <div class="message-avatar" data-user-id="${userId}" style="width: 38px; height: 38px; border-radius: 50%; background: ${userColor}; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; margin-right: 10px; flex-shrink: 0; overflow: hidden; position: absolute; bottom: 0; left: -45px;">
+                ${userInitials}
+            </div>
+        `;
+
+        // Async load avatar
+        if (userId) {
+            setTimeout(async () => {
+                try {
+                    // Try to use cached URL from List if available
+                    // Otherwise fetch
+                    const res = await fetch(`/api/get-user-photo?user_id=${userId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.url) {
+                            const avatarEl = div.querySelector(`.message-avatar[data-user-id="${userId}"]`);
+                            if (avatarEl) {
+                                avatarEl.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Avatar load failed', e);
+                }
+            }, 0);
+        }
+    }
+
+    // Adjust container style for avatar
+    const containerStyle = type !== 'sent' ? 'margin-left: 45px; position: relative;' : '';
 
     div.innerHTML = `
-        <div class="bubble-content">
+        <div class="bubble-content" style="${containerStyle}">
+            ${type !== 'sent' ? avatarHtml : ''}
             ${senderNameHtm}
             ${mediaHtml}
             ${formattedText ? `<div class="message-text">${formattedText}</div>` : ''}
@@ -661,6 +706,28 @@ document.addEventListener('click', async (e) => {
                     const data = await res.json();
                     if (data.error) throw new Error(data.error);
                     btn.textContent = '✓';
+
+                    // 🌿 Instant UI update - add reaction to message bubble
+                    const msgBubble = document.querySelector(`.message-bubble [data-msg-id="${msgId}"]`)?.closest('.message-bubble');
+                    if (msgBubble) {
+                        let reactionsDiv = msgBubble.querySelector('.message-reactions');
+                        if (!reactionsDiv) {
+                            reactionsDiv = document.createElement('div');
+                            reactionsDiv.className = 'message-reactions';
+                            reactionsDiv.style.cssText = 'margin-top: 4px;';
+                            const footer = msgBubble.querySelector('.message-footer');
+                            if (footer) footer.parentNode.insertBefore(reactionsDiv, footer);
+                        }
+                        // Remove old own reaction and add new
+                        const oldOwn = reactionsDiv.querySelector('.reaction-chip.own');
+                        if (oldOwn) oldOwn.remove();
+                        const chip = document.createElement('span');
+                        chip.className = 'reaction-chip own';
+                        chip.style.cssText = 'display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; background: rgba(100, 181, 246, 0.25); border-radius: 12px; font-size: 13px; margin-right: 4px; border: 1px solid rgba(100, 181, 246, 0.4);';
+                        chip.textContent = emoji;
+                        reactionsDiv.appendChild(chip);
+                    }
+
                     setTimeout(() => picker.remove(), 300);
                     console.log('✅ Reaction set:', emoji);
                 } catch (err) {

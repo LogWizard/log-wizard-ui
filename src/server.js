@@ -43,6 +43,35 @@ app.post('/api/send-voice-note', sendVoiceNote);
 app.post('/api/set-reaction', setReaction); // 🌿 Reactions
 app.post('/api/upload', upload.single('file'), uploadFile);
 
+app.get('/api/get-user-photo', async (req, res) => {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).send('User ID required');
+
+    const paramsOnConfig = await configManager.read();
+    const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
+
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+        const data = await response.json();
+
+        if (data.ok && data.result.total_count > 0) {
+            const fileId = data.result.photos[0][0].file_id;
+            const fileResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+            const fileData = await fileResp.json();
+
+            if (fileData.ok) {
+                const filePath = fileData.result.file_path;
+                const photoUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
+                return res.json({ url: photoUrl });
+            }
+        }
+        res.status(404).send('No photo found');
+    } catch (e) {
+        console.error('Error fetching user photo:', e);
+        res.status(500).send(e.message);
+    }
+});
+
 // Manual Mode Routes 🔀
 app.get('/api/get-manual-mode', getManualMode);
 app.post('/api/set-manual-mode', setManualMode);
