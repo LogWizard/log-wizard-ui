@@ -28,8 +28,16 @@ function init() {
     }
 
     setupEventListeners();
-    fetchMessages();
-    setInterval(fetchMessages, 3000);
+    // Smart Polling Loop (Prevents overlap) 🌿
+    const pollingLoop = async () => {
+        try {
+            await fetchMessages();
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+        setTimeout(pollingLoop, 3000);
+    };
+    pollingLoop();
 
     if (typeof initMessageInput === 'function') initMessageInput();
 
