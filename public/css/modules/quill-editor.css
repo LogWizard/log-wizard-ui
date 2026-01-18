@@ -6,23 +6,17 @@
     min-height: 42px;
     max-height: 150px;
     background-color: #080b10;
-    /* Darker background 🌿 */
-    border: 1px solid #2b5278;
-    /* Subtle blue border */
-    border-radius: 20px;
-    /* Rounded corners */
+    /* Darker background */
+    border: none;
+    /* Controlled by wrapper */
+    border-radius: 0 !important;
+    /* Fix bottom gap issue 🌿 */
     color: #fff;
     font-size: 15px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     /* Contains toolbar within rounded corners if needed */
-    transition: border-color 0.2s;
-}
-
-.message-input-quill:focus-within {
-    border-color: #5288c1;
-    /* Highlight on focus */
 }
 
 /* Remove default Quill borders and backgrounds (Snow Theme Override) */
@@ -112,29 +106,41 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Formatting Content Styles */
+/* Formatting Content Styles - MAKE IT POP 💥 */
 .ql-editor strong,
 .ql-editor b {
-    font-weight: 700;
-    color: #fff;
+    font-weight: 800;
+    color: #64b5f6;
+    /* Bright Blue */
+    text-shadow: 0 0 10px rgba(100, 181, 246, 0.3);
 }
 
 .ql-editor em,
 .ql-editor i {
     font-style: italic;
+    color: #d1d5db;
+    /* Light Gray */
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0 2px;
+    border-radius: 2px;
 }
 
 .ql-editor s {
     text-decoration: line-through;
+    color: #ef4444;
+    /* Red strike */
+    opacity: 0.8;
 }
 
 .ql-editor code {
-    background-color: rgba(43, 82, 120, 0.3);
-    padding: 2px 5px;
+    background-color: #2b5278;
+    /* Distinct Blue BG */
+    padding: 2px 6px;
     border-radius: 4px;
     font-family: 'Consolas', monospace;
     color: #7dd3fc;
     font-size: 0.9em;
+    border: 1px solid #1c2a38;
 }
 
 .ql-editor pre {
@@ -155,27 +161,33 @@
 }
 
 .ql-editor a {
-    color: #5288c1;
+    color: #4ade80 !important;
+    /* Bright Green for links */
     text-decoration: underline;
+    cursor: pointer;
 }
 
-/* Custom Spoiler Style */
+/* Custom Spoiler Style - VISIBLE 👁️ */
 .ql-editor .tg-spoiler {
-    background-color: #4a5568;
+    background: repeating-linear-gradient(45deg,
+            #4a5568,
+            #4a5568 10px,
+            #2d3748 10px,
+            #2d3748 20px);
     color: transparent;
     /* Text hidden */
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.3s;
-    user-select: none;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+    padding: 0 4px;
+    border: 1px dashed #718096;
+    transition: all 0.2s;
 }
 
 .ql-editor .tg-spoiler:hover,
 .ql-editor .tg-spoiler.revealed {
-    /* Class or hover to reveal */
-    background-color: rgba(74, 85, 104, 0.3);
-    color: inherit;
+    background: rgba(74, 85, 104, 0.3);
+    color: #fff;
+    border: 1px solid #4a5568;
     text-shadow: none;
 }
 

@@ -131,38 +131,12 @@ function createFallbackInput() {
 
 // Send message from Quill
 function sendQuillMessage() {
-    if (!quill) return;
-
-    const html = quill.root.innerHTML;
-    const text = quill.getText().trim();
-
-    if (!text) return;
-
-    // Convert Quill HTML to Telegram HTML
-    let telegramHtml = html
-        .replace(/<p>/g, '')
-        .replace(/<\/p>/g, '\n')
-        .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
-        .replace(/<em>/g, '<i>').replace(/<\/em>/g, '</i>')
-        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>')
-        .replace(/<span class="tg-spoiler">/g, '<tg-spoiler>').replace(/<\/span>/g, '</tg-spoiler>')
-        .replace(/<pre class="ql-syntax" spellcheck="false">/g, '<pre>').replace(/<\/pre>/g, '</pre>')
-        .replace(/<blockquote>/g, '❝ ').replace(/<\/blockquote>/g, '\n')
-        .replace(/<br>/g, '\n')
-        .trim();
-
-    // Clean up empty tags and extra whitespace
-    telegramHtml = telegramHtml.replace(/<[^/>]+><\/[^>]+>/g, '').trim();
-
-    // Use existing send logic
-    if (typeof window.sendFormattedMessage === 'function') {
-        window.sendFormattedMessage(telegramHtml);
+    // Delegate validation and sending to the main handler 🌿
+    if (typeof window.handleSendMessage === 'function') {
+        window.handleSendMessage();
     } else {
-        console.log('📨 Message to send:', telegramHtml);
+        console.error('❌ handleSendMessage function not found!');
     }
-
-    // Clear editor
-    quill.setText('');
 }
 
 // Get HTML content for external use
