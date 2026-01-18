@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
 import { ConfigManager } from './config-manager.js';
-import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, sendVideoNote, sendVoiceNote } from './api/send-message.js';
+import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, sendVideoNote, sendVoiceNote, setReaction } from './api/send-message.js';
 import { upload, uploadFile } from './api/upload.js';
 import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
 import { ChatsScanner } from './services/chats-scanner.js';
@@ -40,6 +40,7 @@ app.post('/api/send-voice', sendVoice);
 app.post('/api/send-sticker', sendSticker);
 app.post('/api/send-video-note', sendVideoNote);
 app.post('/api/send-voice-note', sendVoiceNote);
+app.post('/api/set-reaction', setReaction); // 🌿 Reactions
 app.post('/api/upload', upload.single('file'), uploadFile);
 
 // Manual Mode Routes 🔀
@@ -477,13 +478,21 @@ export function createMessageServer() {
         const paramsOnConfig = await configManager.read();
         const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
+        // Debug 🌿
+        const hasSticker = !!obj.sticker;
+        const hasPhoto = !!obj.photo;
+        const file_id = await findFileId(obj);
+
+        if ((hasSticker || hasPhoto) && !obj.url_sticker && !obj.url_photo) {
+            console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
+        }
+
         // Check if we have existing url_* field to refresh
         const regex = /\"url_.+?\"/;
         const match = JSON.stringify(obj).match(regex);
 
         if (match) {
             // Existing url field - refresh it
-            const file_id = await findFileId(obj);
             if (file_id && token) {
                 try {
                     const newUrl = await getFileUrl(token, file_id);
@@ -497,24 +506,24 @@ export function createMessageServer() {
         }
 
         // No url_* field - try to create one from file_id 🌿
-        if (token) {
-            const file_id = await findFileId(obj);
-            if (file_id) {
-                try {
-                    const newUrl = await getFileUrl(token, file_id);
-                    // Determine which url field to set based on message type
-                    if (obj.sticker) obj.url_sticker = newUrl;
-                    else if (obj.photo) obj.url_photo = newUrl;
-                    else if (obj.video) obj.url_video = newUrl;
-                    else if (obj.video_note) obj.url_video_note = newUrl;
-                    else if (obj.voice) obj.url_voice = newUrl;
-                    else if (obj.audio) obj.url_audio = newUrl;
-                    else if (obj.animation) obj.url_animation = newUrl;
-                    else if (obj.document) obj.url_document = newUrl;
-                } catch (e) {
-                    console.warn('Failed to create URL from file_id:', e.message);
-                }
+        if (token && file_id) {
+            try {
+                const newUrl = await getFileUrl(token, file_id);
+                console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
+                // Determine which url field to set based on message type
+                if (obj.sticker) obj.url_sticker = newUrl;
+                else if (obj.photo) obj.url_photo = newUrl;
+                else if (obj.video) obj.url_video = newUrl;
+                else if (obj.video_note) obj.url_video_note = newUrl;
+                else if (obj.voice) obj.url_voice = newUrl;
+                else if (obj.audio) obj.url_audio = newUrl;
+                else if (obj.animation) obj.url_animation = newUrl;
+                else if (obj.document) obj.url_document = newUrl;
+            } catch (e) {
+                console.warn(`❌ Failed to create URL for msg ${obj.message_id}:`, e.message);
             }
+        } else if (!token) {
+            console.warn('⚠️ No BOT_TOKEN found for urlReplaser');
         }
 
         return obj;

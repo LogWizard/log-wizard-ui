@@ -506,13 +506,31 @@ function createMessageBubble(msg, type) {
         if (name) senderNameHtm = `<div class="message-sender" style="color: #5288c1; font-weight: 600; font-size: 13px; margin-bottom: 4px;">${name}</div>`;
     }
 
+    // 💬 Reactions HTML 🌿
+    let reactionsHtml = '';
+    if (msg.reactions && Array.isArray(msg.reactions)) {
+        const reactionItems = msg.reactions.map(r => {
+            const emoji = r.emoji || (r.type === 'emoji' ? r.emoji : '❤️');
+            const count = r.count || 1;
+            return `<span class="reaction-chip" style="display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; background: rgba(100, 181, 246, 0.15); border-radius: 12px; font-size: 13px; margin-right: 4px;">${emoji}${count > 1 ? `<span style="font-size: 11px; color: #8b98a7;">${count}</span>` : ''}</span>`;
+        }).join('');
+        reactionsHtml = `<div class="message-reactions" style="margin-top: 4px;">${reactionItems}</div>`;
+    }
+
+    // Reaction button (add reaction) 🌿
+    const msgId = msg.message_id;
+    const chatId = msg.chat?.id || window.selectedChatId;
+    const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0.5; margin-left: 6px; font-size: 12px;" title="Add Reaction">😊</span>`;
+
     div.innerHTML = `
         <div class="bubble-content">
             ${senderNameHtm}
             ${mediaHtml}
             ${formattedText ? `<div class="message-text">${formattedText}</div>` : ''}
+            ${reactionsHtml}
             <div class="message-footer">
                 <span class="message-time">${timeStr}</span>
+                ${reactionBtn}
             </div>
         </div>
     `;
@@ -558,3 +576,64 @@ window.insertFormatting = function (tag) {
 window.handleManualModeToggle = function (e) {
     console.log('Manual mode toggled:', e.target.checked);
 };
+
+// 💬 Reaction Picker Handler 🌿
+document.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('add-reaction-btn')) {
+        e.stopPropagation();
+        const btn = e.target;
+        const msgId = btn.dataset.msgId;
+        const chatId = btn.dataset.chatId;
+
+        if (!msgId || !chatId) return;
+
+        // Remove existing picker if any
+        document.querySelectorAll('.reaction-picker').forEach(p => p.remove());
+
+        // Create emoji picker
+        const picker = document.createElement('div');
+        picker.className = 'reaction-picker';
+        picker.style.cssText = 'position: absolute; background: #17212b; border: 1px solid #2b5278; border-radius: 12px; padding: 8px; display: flex; gap: 6px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+
+        // Common reactions (Telegram allowed list)
+        const emojis = ['👍', '❤️', '🔥', '😂', '😢', '🎉', '🤔', '👎'];
+        emojis.forEach(emoji => {
+            const btn = document.createElement('span');
+            btn.textContent = emoji;
+            btn.style.cssText = 'cursor: pointer; font-size: 20px; padding: 4px; border-radius: 6px; transition: background 0.2s;';
+            btn.onmouseenter = () => btn.style.background = 'rgba(100,181,246,0.2)';
+            btn.onmouseleave = () => btn.style.background = 'transparent';
+            btn.onclick = async () => {
+                picker.remove();
+                try {
+                    const res = await fetch('/api/set-reaction', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: chatId, message_id: parseInt(msgId), emoji })
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    console.log('✅ Reaction set:', emoji);
+                } catch (err) {
+                    console.error('Failed to set reaction:', err);
+                    alert('Помилка: ' + err.message);
+                }
+            };
+            picker.appendChild(btn);
+        });
+
+        // Position picker near button
+        const rect = e.target.getBoundingClientRect();
+        picker.style.left = `${rect.left}px`;
+        picker.style.top = `${rect.bottom + 5}px`;
+        document.body.appendChild(picker);
+
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', function closePicker() {
+                picker.remove();
+                document.removeEventListener('click', closePicker);
+            }, { once: true });
+        }, 100);
+    }
+});

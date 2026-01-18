@@ -408,3 +408,42 @@ export async function sendVoiceNote(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
+
+/**
+ * POST /api/set-reaction 🌿
+ * Set reaction on a message
+ */
+export async function setReaction(req, res) {
+    const { chat_id, message_id, emoji, is_big } = req.body;
+
+    if (!chat_id || !message_id) {
+        return res.status(400).json({ error: 'chat_id and message_id are required' });
+    }
+
+    try {
+        // Build reaction array (single emoji for non-premium bots)
+        const reaction = emoji ? [{ type: 'emoji', emoji }] : [];
+
+        const payload = {
+            chat_id,
+            message_id,
+            reaction,
+            is_big: is_big || false
+        };
+
+        const response = await fetch(`${TELEGRAM_API}/setMessageReaction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) throw new Error(data.description);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error setting reaction:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
