@@ -99,7 +99,11 @@ export async function fetchMessages() {
                 const newAllMessages = [...state.allMessages];
                 messages.forEach(msg => {
                     const mid = msg.message_id?.toString();
-                    if (!newAllMessages.find(m => m.message_id?.toString() === mid)) {
+                    const existingIndex = newAllMessages.findIndex(m => m.message_id?.toString() === mid);
+                    if (existingIndex !== -1) {
+                        // Update existing message (legacy merge or replace? Replace is safer for reactions)
+                        newAllMessages[existingIndex] = msg;
+                    } else {
                         newAllMessages.push(msg);
                     }
                 });
@@ -142,7 +146,15 @@ export async function fetchSingleChatUpdate(chatId) {
                 newMsgs.forEach(msg => {
                     // Ensure ID is string for robust finding 🌿
                     const mid = msg.message_id?.toString();
-                    if (!currentMsgs.find(m => m.message_id?.toString() === mid)) {
+                    const existingIndex = currentMsgs.findIndex(m => m.message_id?.toString() === mid);
+
+                    if (existingIndex !== -1) {
+                        currentMsgs[existingIndex] = msg;
+                        // Sync global
+                        const globalIndex = state.allMessages.findIndex(m => m.message_id?.toString() === mid);
+                        if (globalIndex !== -1) state.allMessages[globalIndex] = msg;
+                        updated = true;
+                    } else {
                         currentMsgs.push(msg);
                         // Sync global
                         if (!state.allMessages.find(m => m.message_id?.toString() === mid)) {

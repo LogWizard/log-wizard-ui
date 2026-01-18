@@ -1357,3 +1357,18 @@ body {
     z-index: auto;
 }
 
+
+/* Fix: Make Add/Reaction buttons clickable on own messages */
+.message-bubble.me .message-footer,
+.message-bubble.client .message-footer,
+.message-bubble.me .add-reaction-btn,
+.message-bubble.client .add-reaction-btn {
+    pointer-events: auto !important;
+}
+
+/* Ensure reaction chips are also clickable */
+.message-bubble.me .reaction-chip,
+.message-bubble.client .reaction-chip {
+    pointer-events: auto !important;
+}
+

@@ -541,7 +541,7 @@ function createMessageBubble(msg, type) {
     // Reaction button (add reaction) 🌿
     const msgId = msg.message_id;
     const chatId = msg.chat?.id || window.selectedChatId;
-    const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0.6; margin-left: 8px; font-size: 14px; transition: opacity 0.2s;" title="Add Reaction" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">😊</span>`;
+    const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0.6; margin-left: 8px; font-size: 14px; transition: opacity 0.2s;" title="Add Reaction" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">➕</span>`;
 
     // 👤 Avatar HTML 🌿
     let avatarHtml = '';
