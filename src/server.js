@@ -219,7 +219,8 @@ export function createMessageServer() {
 
             for (const dateFolder of dateFolders) {
                 let folderPath = path.join(MSG_PATH, dateFolder);
-                if (group && group !== 'allPrivate') {
+                // 🌿 Fix: Only enter subdirectory for groups (IDs with '-'). Private chats are in root date folder.
+                if (group && group !== 'allPrivate' && group.includes('-')) {
                     folderPath = path.join(folderPath, group);
                 }
 
