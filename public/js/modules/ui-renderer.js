@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { fetchMessages, fetchMessagesForDate, fetchSingleChatUpdate } from './api.js';
-import { safeParseDate, isToday as checkIsToday } from './utils.js';
+import { safeParseDate, isToday as checkIsToday, getColorForUser } from './utils.js';
 
 let lastRenderedChatId = null;
 let renderedMessageIds = new Set();

@@ -50,3 +50,15 @@ export function isToday(date) {
 window.formatDate = formatDate;
 window.safeParseDate = safeParseDate;
 window.isToday = isToday;
+
+export function getColorForUser(id) {
+    let hash = 0;
+    const str = String(id || 'default');
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash) % 360;
+    return \hsl(\, 70%, 50%)\;
+}
+
+window.getColorForUser = getColorForUser;
