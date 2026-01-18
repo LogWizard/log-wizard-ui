@@ -316,13 +316,8 @@ function initStickerPicker() {
     const panel = document.getElementById('stickerPicker');
     if (!btn || !panel) return;
 
-    // Defined Sticker Sets
-    const stickerSets = [
-        'Brilevsky',
-        'VikostVSpack',
-        'horoshok_k_by_fStikBot',
-        'CystsDribsAssai_by_fStikBot'
-    ];
+    // Load Sets from DB 🌿
+    let stickerSets = [];
     let currentSetIndex = 0;
     let loadedSets = {}; // Cache
 
@@ -334,21 +329,90 @@ function initStickerPicker() {
     if (!tabsHeader) {
         tabsHeader = document.createElement('div');
         tabsHeader.className = 'sticker-tabs';
-        tabsHeader.style.cssText = 'display: flex; overflow-x: auto; padding: 5px; background: #0e1621; border-bottom: 1px solid #2b5278; gap: 5px; scrollbar-width: none;';
+        tabsHeader.style.cssText = 'display: flex; align-items: center; overflow-x: auto; padding: 5px; background: #0e1621; border-bottom: 1px solid #2b5278; gap: 5px; scrollbar-width: none;';
 
-        // Render Tabs
-        stickerSets.forEach((set, index) => {
-            const tab = document.createElement('div');
-            tab.textContent = set.substring(0, 10) + '...'; // Short name
-            tab.title = set;
-            tab.style.cssText = 'padding: 5px 10px; cursor: pointer; font-size: 12px; color: #8b98a7; white-space: nowrap; border-radius: 10px; transition: all 0.2s;';
-            if (index === 0) tab.style.color = '#64b5f6';
-
-            tab.onclick = () => loadStickerSet(index);
-            tabsHeader.appendChild(tab);
-        });
+        // Add Import Button (+)
+        const addBtn = document.createElement('div');
+        addBtn.textContent = '+';
+        addBtn.title = 'Add Sticker Set';
+        addBtn.style.cssText = 'padding: 5px 10px; cursor: pointer; font-weight: bold; color: #4caf50; background: rgba(76, 175, 80, 0.1); border-radius: 10px;';
+        addBtn.onclick = async () => {
+            const name = prompt('Enter Sticker Set Name (e.g. "UaPusheen"):'); // Simple prompt for now
+            if (name) {
+                try {
+                    const res = await fetch('/api/sticker-sets/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ setName: name })
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    alert('Set Added! Reloading...');
+                    loadSets(); // Reload
+                } catch (e) {
+                    alert('Error: ' + e.message);
+                }
+            }
+        };
+        tabsHeader.appendChild(addBtn);
 
         panel.insertBefore(tabsHeader, container);
+    }
+
+    // Fetch Sets Function
+    async function loadSets() {
+        try {
+            const res = await fetch('/api/sticker-sets');
+            const data = await res.json();
+            stickerSets = data.map(s => s.name);
+
+            // Clear old tabs (except + button)
+            while (tabsHeader.childNodes.length > 1) {
+                tabsHeader.removeChild(tabsHeader.childNodes[1]); // Remove tabs, keep + at index 0? Wait, + is appended last? 
+                // Actually let's just rebuild mostly.
+            }
+            // Or better: clear all and re-add +
+            tabsHeader.innerHTML = '';
+
+            // Re-add import button
+            const addBtn = document.createElement('div');
+            addBtn.textContent = '+';
+            addBtn.title = 'Add Sticker Set';
+            addBtn.style.cssText = 'padding: 5px 10px; cursor: pointer; font-weight: bold; color: #4caf50; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-right: 5px;';
+            addBtn.onclick = async () => {
+                const name = prompt('Enter Sticker Set Name (e.g., "VikostVSpack"):');
+                if (name) {
+                    try {
+                        const res = await fetch('/api/sticker-sets/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ setName: name })
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error);
+                        loadSets();
+                    } catch (e) { alert(e.message); }
+                }
+            };
+            tabsHeader.appendChild(addBtn);
+
+            stickerSets.forEach((set, index) => {
+                const tab = document.createElement('div');
+                tab.textContent = set.length > 10 ? set.substring(0, 10) + '...' : set;
+                tab.title = set;
+                tab.style.cssText = 'padding: 5px 10px; cursor: pointer; font-size: 12px; color: #8b98a7; white-space: nowrap; border-radius: 10px; transition: all 0.2s;';
+
+                tab.onclick = () => loadStickerSet(index);
+                tabsHeader.appendChild(tab);
+            });
+
+            if (stickerSets.length > 0) {
+                // Auto load first only if requested?
+                // loadStickerSet(0);
+            }
+        } catch (e) {
+            console.error('Failed to load sets', e);
+        }
     }
 
     // Toggle Panel
@@ -357,8 +421,8 @@ function initStickerPicker() {
         const isVisible = panel.style.display === 'flex';
         panel.style.display = isVisible ? 'none' : 'flex';
 
-        if (!isVisible && !loadedSets[stickerSets[currentSetIndex]]) {
-            loadStickerSet(currentSetIndex);
+        if (!isVisible) {
+            if (stickerSets.length === 0) loadSets();
         }
     });
 

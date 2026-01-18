@@ -11,6 +11,8 @@ import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, s
 import { upload, uploadFile } from './api/upload.js';
 import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
 import { ChatsScanner } from './services/chats-scanner.js';
+import { initDB, getStickerSets, addStickerSet } from './services/db.js'; // 🌿 DB Service
+import fetch from 'node-fetch'; // Ensure fetch is available
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,7 +87,12 @@ if (paramsKeys.length !== 0) {
     port = paramsOnConfig['Listening Port'];
     MSG_PATH = paramsOnConfig['Listening Path'];
     corsServerPort = paramsOnConfig['Cors Server Port'];
+    corsServerPort = paramsOnConfig['Cors Server Port'];
 }
+
+// 🌿 Initialize Database
+await initDB();
+
 app.use(express.json());
 async function readConfigPrams() { return configManager.read(); }
 const getIPv4FromIPV6 = (ipAddress) => {
@@ -282,18 +289,57 @@ export function createMessageServer() {
     /* Цей роутер відповідає за обробку запиту /chat */
 
     /* Цей роутер відповідає за обробку всіх інших запитів */
-    // 🌿 Sticker API
+    // 🌿 Sticker API Routes
+
+    // 1. Get All Sticker Sets (from DB)
+    app.get('/api/sticker-sets', async (req, res) => {
+        const sets = await getStickerSets();
+        res.json(sets);
+    });
+
+    // 2. Import Sticker Set (to DB)
+    app.post('/api/sticker-sets/import', async (req, res) => {
+        const { setName, title } = req.body;
+        if (!setName) return res.status(400).json({ error: 'Name required' });
+
+        try {
+            // Validate with Telegram first
+            const paramsOnConfig = await configManager.read();
+            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
+
+            const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
+            const check = await fetch(url);
+            const data = await check.json();
+
+            if (!data.ok) return res.status(400).json({ error: 'Telegram: ' + data.description });
+
+            // Add to DB
+            await addStickerSet(setName, title || data.result.title);
+            res.json({ success: true, set: data.result });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // 3. Get Stickers from Telegram (Proxy)
     app.get('/api/stickers/:setName', async (req, res) => {
         try {
             const { setName } = req.params;
-            const token = process.env.TG_BOT_TOKEN || process.env.BOT_TOKEN;
+            const paramsOnConfig = await configManager.read();
+            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
+
+            if (!token) {
+                console.error('❌ No Bot Token found for stickers!');
+                return res.status(500).json({ error: 'Server Config Error: No Bot Token' });
+            }
+
             const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
 
-            // Use global fetch (Node 18+) or dynamic import if needed
             const response = await fetch(url);
             const data = await response.json();
 
             if (!data.ok) {
+                console.warn(`⚠️ Telegram Error for set ${setName}:`, data.description);
                 return res.status(400).json({ error: data.description });
             }
             res.json(data.result);
@@ -303,10 +349,12 @@ export function createMessageServer() {
         }
     });
 
+    // 4. Sticker Image Proxy
     app.get('/api/sticker-image/:fileId', async (req, res) => {
         try {
             const { fileId } = req.params;
-            const token = process.env.TG_BOT_TOKEN || process.env.BOT_TOKEN;
+            const paramsOnConfig = await configManager.read();
+            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
             // 1. Get File Path
             const pathResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
@@ -327,7 +375,6 @@ export function createMessageServer() {
             if (ext === '.webm') contentType = 'video/webm';
 
             res.setHeader('Content-Type', contentType);
-            // Cache for 1 hour
             res.setHeader('Cache-Control', 'public, max-age=3600');
 
             if (imageResp.body && imageResp.body.pipe) {
