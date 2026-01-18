@@ -34,7 +34,7 @@ function initQuillEditor() {
 
     try {
         quill = new Quill('#quillEditor', {
-            theme: 'bubble',
+            theme: 'snow',
             placeholder: 'Написати повідомлення...',
             modules: {
                 toolbar: '#quillToolbar',

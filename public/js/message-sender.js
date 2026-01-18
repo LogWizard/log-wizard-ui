@@ -177,21 +177,23 @@ function initMessageInput() {
     const sendBtn = document.getElementById('sendBtn');
     const attachBtn = document.getElementById('attachBtn');
 
-    if (!messageInput || !sendBtn) {
-        console.warn('⚠️ Message input elements not found');
+    if (!sendBtn) {
+        console.warn('⚠️ Send button not found');
         return;
     }
 
     // Send on button click
     sendBtn.addEventListener('click', handleSendMessage);
 
-    // Send on Enter (Shift+Enter for new line would need textarea)
-    messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    });
+    // Send on Enter (Legacy Input)
+    if (messageInput) {
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+        });
+    }
 
     // Attach file handler
     if (attachBtn) {
