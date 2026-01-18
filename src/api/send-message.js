@@ -273,7 +273,14 @@ export async function sendSticker(req, res) {
         if (!data.ok) throw new Error(data.description);
 
         if (data.result) {
-            if (sticker && typeof sticker === 'string') data.result.url_sticker = sticker;
+            // Store full URL for rendering 🌿
+            if (sticker && typeof sticker === 'string') {
+                data.result.url_sticker = `/api/sticker-image/${sticker}`;
+                // Also check if it's animated/video
+                if (data.result.sticker?.is_video) {
+                    data.result.is_video_sticker = true;
+                }
+            }
             if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
         }
 

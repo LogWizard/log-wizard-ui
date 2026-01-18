@@ -373,14 +373,14 @@ function initStickerPicker() {
                 console.error('API Error, using fallback', e);
             }
 
-            // Fallback if DB empty or failed 🌿
+            // Fallback if DB empty or failed 🌿 (animated first)
             if (!sets || sets.length === 0) {
                 console.warn('⚠️ No sets from DB, using fallback defaults.');
                 sets = [
-                    'Brilevsky',
                     'VikostVSpack',
-                    'horoshok_k_by_fStikBot',
-                    'CystsDribsAssai_by_fStikBot'
+                    'CystsDribsAssai_by_fStikBot',
+                    'Brilevsky',
+                    'horoshok_k_by_fStikBot'
                 ];
             }
 
@@ -394,15 +394,17 @@ function initStickerPicker() {
             addBtn.textContent = '+';
             addBtn.title = 'Add Sticker Set';
             addBtn.style.cssText = 'padding: 5px 10px; cursor: pointer; font-weight: bold; color: #4caf50; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-right: 5px; min-width: 24px; text-align: center;';
-            addBtn.onclick = async () => {
+            addBtn.onclick = async (e) => {
+                e.stopPropagation(); // Prevent panel close
                 const name = prompt('Enter Sticker Set Name (e.g., "VikostVSpack"):');
                 if (name) {
                     try {
                         const res = await fetch('/api/sticker-sets/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setName: name }) });
                         const data = await res.json();
                         if (data.error) throw new Error(data.error);
+                        alert('Додано! Завантажую...');
                         loadSets();
-                    } catch (e) { alert(e.message); }
+                    } catch (e) { alert('Помилка: ' + e.message); }
                 }
             };
             tabsHeader.appendChild(addBtn);
@@ -493,41 +495,68 @@ function initStickerPicker() {
 
         stickers.forEach(sticker => {
             const item = document.createElement('div');
-            item.style.cssText = 'height: 64px; width: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; position: relative;';
-            item.onmouseover = () => item.style.transform = 'scale(1.1)';
-            item.onmouseout = () => item.style.transform = 'scale(1)';
+            item.style.cssText = 'height: 64px; width: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; position: relative; overflow: hidden;';
 
             // Determine preview file_id (use thumbnail for animated/video stickers)
             const thumbId = sticker.thumbnail?.file_id || sticker.thumb?.file_id;
             const previewFileId = thumbId || sticker.file_id;
+            const isAnimated = sticker.is_video || sticker.is_animated;
 
-            let mediaEl;
-            if (sticker.is_video && !thumbId) {
-                // Video sticker without thumbnail - render as video
-                mediaEl = document.createElement('video');
-                mediaEl.autoplay = true;
-                mediaEl.loop = true;
-                mediaEl.muted = true;
-                mediaEl.playsInline = true;
-            } else {
-                // Static or has thumbnail - render as img
-                mediaEl = document.createElement('img');
-                mediaEl.loading = 'lazy';
-            }
-
-            mediaEl.src = `/api/sticker-image/${previewFileId}`;
-            mediaEl.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+            // Create static preview (thumbnail or main file)
+            const img = document.createElement('img');
+            img.src = `/api/sticker-image/${previewFileId}`;
+            img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+            img.loading = 'lazy';
+            item.appendChild(img);
 
             // Badge for animated/video 🌿
-            if (sticker.is_animated || sticker.is_video) {
-                const badge = document.createElement('span');
+            let badge = null;
+            if (isAnimated) {
+                badge = document.createElement('span');
                 badge.innerText = '▶';
-                badge.style.cssText = 'position: absolute; bottom: 2px; right: 2px; font-size: 8px; color: white; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px;';
+                badge.style.cssText = 'position: absolute; bottom: 2px; right: 2px; font-size: 8px; color: white; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px; transition: opacity 0.2s;';
                 item.appendChild(badge);
             }
 
-            item.onclick = async () => {
-                // Get current chat ID 🌿
+            // Hover animation for video stickers 🌿
+            let videoEl = null;
+            if (sticker.is_video) {
+                item.onmouseenter = () => {
+                    item.style.transform = 'scale(1.15)';
+                    if (badge) badge.style.opacity = '0';
+
+                    // Create video element on hover (or reuse cached)
+                    if (!videoEl) {
+                        videoEl = document.createElement('video');
+                        videoEl.src = `/api/sticker-image/${sticker.file_id}`;
+                        videoEl.loop = true;
+                        videoEl.muted = true;
+                        videoEl.playsInline = true;
+                        videoEl.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain; position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
+                    }
+                    img.style.opacity = '0';
+                    item.appendChild(videoEl);
+                    // Restart video on each hover 🌿
+                    videoEl.currentTime = 0;
+                    videoEl.play().catch(() => { }); // Ignore autoplay errors
+                };
+
+                item.onmouseleave = () => {
+                    item.style.transform = 'scale(1)';
+                    if (badge) badge.style.opacity = '1';
+                    img.style.opacity = '1';
+                    if (videoEl && videoEl.parentNode) {
+                        videoEl.parentNode.removeChild(videoEl);
+                    }
+                };
+            } else {
+                // Non-video: simple scale on hover
+                item.onmouseenter = () => item.style.transform = 'scale(1.1)';
+                item.onmouseleave = () => item.style.transform = 'scale(1)';
+            }
+
+            item.onclick = async (e) => {
+                e.stopPropagation();
                 const chatId = window.selectedChatId;
                 if (!chatId) {
                     alert('Оберіть чат спочатку!');
@@ -539,14 +568,13 @@ function initStickerPicker() {
                     await sendSticker(chatId, sticker.file_id);
                     item.style.opacity = '1';
                     panel.style.display = 'none';
-                } catch (e) {
-                    console.error('Sticker send error:', e);
+                } catch (err) {
+                    console.error('Sticker send error:', err);
                     alert('Помилка відправки стікера');
                     item.style.opacity = '1';
                 }
             };
 
-            item.appendChild(mediaEl);
             container.appendChild(item);
         });
     }
