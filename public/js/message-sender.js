@@ -325,12 +325,14 @@ function initRecordingHandlers() {
     let timerInterval = null;
     let stream = null;
     let recordingType = null; // 'audio' or 'video'
+    let isCancelled = false; // 🌿 Cancel Flag
 
     if (!recordAudioBtn || !recordVideoBtn) return;
 
     async function startRecording(type) {
         recordingType = type;
         chunks = [];
+        isCancelled = false; // Reset flag
         try {
             const constraints = type === 'video'
                 ? { video: { aspectRatio: 1, facingMode: 'user' }, audio: true }
@@ -349,25 +351,35 @@ function initRecordingHandlers() {
 
             overlay.style.display = 'flex';
 
+            // Chrome records audio as video/webm usually or audio/webm
             const mimeType = type === 'video' ? 'video/webm;codecs=vp8,opus' : 'audio/webm;codecs=opus';
-            // Fallback for Safari/others if needed, but Chrome supports webm
 
-            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            // Check if supported
+            let options = { mimeType };
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                console.warn(`${mimeType} not supported, trying default`);
+                options = {}; // Use default browser format
+            }
+
+            mediaRecorder = new MediaRecorder(stream, options);
 
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) chunks.push(e.data);
             };
 
             mediaRecorder.onstop = async () => {
-                // Stop tracks
+                // Stop tracks immediately
                 stream.getTracks().forEach(track => track.stop());
                 clearInterval(timerInterval);
                 overlay.style.display = 'none';
 
-                if (chunks.length === 0) return; // Cancelled
+                if (isCancelled || chunks.length === 0) {
+                    console.log('🛑 Recording cancelled set, ignoring chunks.');
+                    return;
+                }
 
-                const blob = new Blob(chunks, { type: mimeType });
-                const ext = type === 'video' ? 'webm' : 'webm'; // Browser records webm usually
+                const blob = new Blob(chunks, { type: mediaRecorder.mimeType || mimeType });
+                const ext = 'webm'; // Most browsers produce webm containers
                 const filename = `recording_${Date.now()}.${ext}`;
                 const file = new File([blob], filename, { type: blob.type });
 
@@ -395,10 +407,12 @@ function initRecordingHandlers() {
     }
 
     function stopRecording(send = true) {
+        if (!send) isCancelled = true; // 🌿 Set cancel flag BEFORE stopping
+
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            if (!send) chunks = []; // Clear chunks if cancelled
             mediaRecorder.stop();
         } else {
+            // Cleanup if not recording state
             if (stream) stream.getTracks().forEach(track => track.stop());
             overlay.style.display = 'none';
             clearInterval(timerInterval);
@@ -418,7 +432,7 @@ function initRecordingHandlers() {
                 isRecordedNote: true // 🌿 Flag to force Note Mode send
             };
 
-            // Force Toggle visually for user feedback (optional but good)
+            // Force Toggle visually for user feedback
             const toggle = document.getElementById('videoNoteToggle');
             if (toggle) {
                 toggle.checked = true;
@@ -428,9 +442,8 @@ function initRecordingHandlers() {
             // Immediately Send
             await handleSendMessage();
 
-            // Reset toggle if it wasn't on before? Nah, keep it.
-
         } catch (error) {
+            console.error('Upload Error Details:', error);
             alert('Error sending recording: ' + error.message);
         }
     }

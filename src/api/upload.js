@@ -40,7 +40,9 @@ const fileFilter = (req, file, cb) => {
         'video/webm',
         'audio/mpeg',
         'audio/ogg',
-        'audio/wav'
+        'audio/wav',
+        'audio/webm', // 🌿 Critical for MediaRecorder audio
+        'video/ogg'   // 🌿 Rare but possible
     ];
 
     if (allowedTypes.includes(file.mimetype)) {
