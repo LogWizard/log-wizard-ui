@@ -442,7 +442,46 @@ export async function setReaction(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
-        res.json({ success: true });
+        // 🌿 Update local JSON file with our reaction
+        try {
+            const currentConfig = configManager.read();
+            const msgPathBase = currentConfig['Listening Path'] || 'messages';
+
+            // Find message file by ID (search recent dates)
+            const today = new Date();
+            for (let i = 0; i < 7; i++) { // Search last 7 days
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toLocaleDateString('uk-UA');
+                const filePath = path.join(msgPathBase, dateStr, `${message_id}.json`);
+
+                if (fs.existsSync(filePath)) {
+                    const msgData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+                    // Update reactions in Telegram format
+                    if (!msgData.reactions) msgData.reactions = { results: [] };
+                    if (!msgData.reactions.results) msgData.reactions.results = [];
+
+                    // Remove old same-type reaction from us, add new one
+                    msgData.reactions.results = msgData.reactions.results.filter(r => !r.is_own);
+                    if (emoji) {
+                        msgData.reactions.results.push({
+                            type: { type: 'emoji', emoji },
+                            total_count: 1,
+                            is_own: true
+                        });
+                    }
+
+                    fs.writeFileSync(filePath, JSON.stringify(msgData, null, 2));
+                    console.log(`💬 Reaction saved to ${filePath}`);
+                    break;
+                }
+            }
+        } catch (fileErr) {
+            console.warn('⚠️ Could not update local reaction:', fileErr.message);
+        }
+
+        res.json({ success: true, emoji });
     } catch (error) {
         console.error('Error setting reaction:', error);
         res.status(500).json({ error: error.message });

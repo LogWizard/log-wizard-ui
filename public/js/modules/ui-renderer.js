@@ -594,21 +594,64 @@ document.addEventListener('click', async (e) => {
         // Remove existing picker if any
         document.querySelectorAll('.reaction-picker').forEach(p => p.remove());
 
-        // Create emoji picker
+        // Create emoji picker with nice grid layout
         const picker = document.createElement('div');
         picker.className = 'reaction-picker';
-        picker.style.cssText = 'position: absolute; background: #17212b; border: 1px solid #2b5278; border-radius: 12px; padding: 8px; display: flex; gap: 6px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+        picker.style.cssText = `
+            position: fixed;
+            background: linear-gradient(135deg, #1e2c3a 0%, #17212b 100%);
+            border: 1px solid #2b5278;
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-width: 280px;
+            z-index: 10000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            animation: fadeIn 0.15s ease-out;
+        `;
 
-        // Common reactions (Telegram allowed list)
-        const emojis = ['👍', '❤️', '🔥', '😂', '😢', '🎉', '🤔', '👎'];
+        // Extended emoji list (Telegram allowed + popular) 🌿
+        const emojis = [
+            // Row 1: Classic
+            '👍', '👎', '❤️', '🔥', '🥰', '👏', '😁', '🤔',
+            // Row 2: Emotions
+            '🤯', '😱', '🤬', '😢', '🎉', '🤩', '🤮', '💩',
+            // Row 3: More
+            '🙏', '👌', '🕊️', '🤡', '🥱', '🥴', '😍', '🐳',
+            // Row 4: Special
+            '❤️‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆',
+            // Row 5: Fun
+            '💔', '🖕', '😐', '🍓', '🍾', '💋', '😴', '👀'
+        ];
+
         emojis.forEach(emoji => {
             const btn = document.createElement('span');
             btn.textContent = emoji;
-            btn.style.cssText = 'cursor: pointer; font-size: 20px; padding: 4px; border-radius: 6px; transition: background 0.2s;';
-            btn.onmouseenter = () => btn.style.background = 'rgba(100,181,246,0.2)';
-            btn.onmouseleave = () => btn.style.background = 'transparent';
+            btn.style.cssText = `
+                cursor: pointer;
+                font-size: 22px;
+                padding: 6px;
+                border-radius: 8px;
+                transition: all 0.15s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+            `;
+            btn.onmouseenter = () => {
+                btn.style.background = 'rgba(100,181,246,0.25)';
+                btn.style.transform = 'scale(1.2)';
+            };
+            btn.onmouseleave = () => {
+                btn.style.background = 'transparent';
+                btn.style.transform = 'scale(1)';
+            };
             btn.onclick = async () => {
-                picker.remove();
+                btn.style.background = 'rgba(100,181,246,0.5)';
+                btn.textContent = '⏳';
                 try {
                     const res = await fetch('/api/set-reaction', {
                         method: 'POST',
@@ -617,27 +660,44 @@ document.addEventListener('click', async (e) => {
                     });
                     const data = await res.json();
                     if (data.error) throw new Error(data.error);
+                    btn.textContent = '✓';
+                    setTimeout(() => picker.remove(), 300);
                     console.log('✅ Reaction set:', emoji);
                 } catch (err) {
                     console.error('Failed to set reaction:', err);
-                    alert('Помилка: ' + err.message);
+                    btn.textContent = '❌';
+                    setTimeout(() => { btn.textContent = emoji; }, 1000);
                 }
             };
             picker.appendChild(btn);
         });
 
-        // Position picker near button
+        // Position picker near button (with viewport bounds check)
         const rect = e.target.getBoundingClientRect();
-        picker.style.left = `${rect.left}px`;
-        picker.style.top = `${rect.bottom + 5}px`;
+        let left = rect.left;
+        let top = rect.bottom + 8;
+
+        // Adjust if goes off screen
+        if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
+        if (top + 200 > window.innerHeight) top = rect.top - 200;
+
+        picker.style.left = `${Math.max(10, left)}px`;
+        picker.style.top = `${Math.max(10, top)}px`;
         document.body.appendChild(picker);
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = '@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }';
+        picker.appendChild(style);
 
         // Close on outside click
         setTimeout(() => {
-            document.addEventListener('click', function closePicker() {
-                picker.remove();
-                document.removeEventListener('click', closePicker);
-            }, { once: true });
+            document.addEventListener('click', function closePicker(evt) {
+                if (!picker.contains(evt.target)) {
+                    picker.remove();
+                    document.removeEventListener('click', closePicker);
+                }
+            });
         }, 100);
     }
 });
