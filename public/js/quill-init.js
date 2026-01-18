@@ -83,23 +83,23 @@ function initQuillEditor() {
 
         // 1. Spoiler Handler
         toolbar.addHandler('spoiler', function () {
-            const range = quill.getSelection();
+            const range = quill.getSelection(true); // 🌿 true = ignore focus check
             if (range) {
                 const format = quill.getFormat(range);
                 quill.format('spoiler', !format.spoiler);
             }
         });
 
-        // 2. Link Handler (Improved)
+        // 2. Link Handler (Improved & Robust)
         toolbar.addHandler('link', function (value) {
             if (value) {
-                const range = quill.getSelection();
+                const range = quill.getSelection(true); // 🌿 Ignore focus check
                 if (range) {
                     const currentFormat = quill.getFormat(range);
                     const defaultValue = currentFormat.link || 'https://';
 
                     const url = prompt('Введіть посилання (URL):', defaultValue);
-                    quill.focus(); // 🌿 Restore focus to editor!
+                    quill.focus(); // Restore focus
 
                     if (url) {
                         quill.format('link', url);
@@ -121,7 +121,7 @@ function initQuillEditor() {
             if (linkBtn && !linkBtn.innerHTML.includes('🔗')) linkBtn.innerHTML = '🔗';
         }, 100);
 
-        console.log('🌿 Quill editor initialized (Link Fixed, Marker Removed)');
+        console.log('🌿 Quill editor initialized (Link & Focus repaired)');
     } catch (e) {
         console.error('Quill init error:', e);
         createFallbackInput();
