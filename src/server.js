@@ -274,7 +274,8 @@ export function createMessageServer() {
 
     /* Цей роутер відповідає за обробку всіх інших запитів */
     app.get(/^\/(css|fonts|js)\//i, (req, res) => {
-        const filePath = path.join(appDirectory, 'public', req.url);
+        // Use req.path to ignore query parameters like ?v=2 🌿
+        const filePath = path.join(appDirectory, 'public', req.path);
         const fileExtension = path.extname(filePath);
         const contentType = fileTypes[fileExtension] || 'application/octet-stream';
         fs.readFile(filePath, (err, content) => {
