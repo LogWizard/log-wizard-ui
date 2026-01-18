@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
 import { ConfigManager } from './config-manager.js';
-import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice } from './api/send-message.js';
+import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, sendVideoNote, sendVoiceNote } from './api/send-message.js';
 import { upload, uploadFile } from './api/upload.js';
 import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
 import { ChatsScanner } from './services/chats-scanner.js';
@@ -35,6 +35,9 @@ app.post('/api/send-photo', sendPhoto);
 app.post('/api/send-video', sendVideo);
 app.post('/api/send-audio', sendAudio);
 app.post('/api/send-voice', sendVoice);
+app.post('/api/send-sticker', sendSticker);
+app.post('/api/send-video-note', sendVideoNote);
+app.post('/api/send-voice-note', sendVoiceNote);
 app.post('/api/upload', upload.single('file'), uploadFile);
 
 // Manual Mode Routes 🔀

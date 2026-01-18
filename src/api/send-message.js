@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import FormData from 'form-data'; // 🌿 Added for local file uploads
+import { convertVideoToNote, convertAudioToVoice } from '../services/video-processor.js'; // 🌿 Video/Audio service
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -241,7 +242,6 @@ export async function sendVoice(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
-        // 🌿 Preserve Media URL for local history
         if (data.result) {
             if (voice && typeof voice === 'string') data.result.url_voice = voice;
             if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
@@ -251,6 +251,153 @@ export async function sendVoice(req, res) {
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending voice:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * POST /api/send-sticker 🌿
+ */
+export async function sendSticker(req, res) {
+    const { chat_id, sticker } = req.body;
+
+    if (!chat_id || !sticker) {
+        return res.status(400).json({ error: 'chat_id and sticker are required' });
+    }
+
+    try {
+        const payload = { chat_id, sticker };
+        const response = await sendMediaRequest('sendSticker', payload, 'sticker', sticker);
+        const data = await response.json();
+
+        if (!data.ok) throw new Error(data.description);
+
+        if (data.result) {
+            if (sticker && typeof sticker === 'string') data.result.url_sticker = sticker;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
+        }
+
+        saveMessageLocally(data, 'Sticker');
+        res.json({ success: true, message: data.result });
+    } catch (error) {
+        console.error('Error sending sticker:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * POST /api/send-video-note 🌿
+ */
+export async function sendVideoNote(req, res) {
+    const { chat_id, video_note } = req.body; // video_note should be URL to upload
+
+    if (!chat_id || !video_note) {
+        return res.status(400).json({ error: 'chat_id and video_note are required' });
+    }
+
+    // Must be local file to process
+    if (!video_note.includes('/uploads/')) {
+        return res.status(400).json({ error: 'Video note must be a locally uploaded file' });
+    }
+
+    const filename = video_note.split('/uploads/').pop();
+    const localInputPath = path.join(appDirectory, 'public', 'uploads', filename);
+    const localOutputPath = path.join(appDirectory, 'public', 'uploads', `note-${filename}.mp4`); // Ensure .mp4
+
+    try {
+        if (!fs.existsSync(localInputPath)) throw new Error('Input file not found');
+
+        console.log(`🎬 Processing Video Note: ${localInputPath}...`);
+        await convertVideoToNote(localInputPath, localOutputPath);
+        console.log(`✅ Video Note Ready: ${localOutputPath}`);
+
+        // Send processed file
+        const form = new FormData();
+        form.append('chat_id', chat_id);
+        form.append('video_note', fs.createReadStream(localOutputPath));
+
+        const response = await fetch(`${TELEGRAM_API}/sendVideoNote`, {
+            method: 'POST',
+            headers: form.getHeaders(),
+            body: form
+        });
+
+        const data = await response.json();
+
+        // Cleanup processed input file (optional) but keep note output
+        // fs.unlinkSync(localInputPath); 
+
+        if (!data.ok) throw new Error(data.description);
+
+        if (data.result) {
+            // Use the NEW processed URL for local storage/UI
+            // The file is physically at localOutputPath, which corresponds to uploads/note-filename.mp4
+            const processedUrl = video_note.replace(filename, `note-${filename}.mp4`);
+            data.result.url_video_note = processedUrl;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
+        }
+
+        saveMessageLocally(data, 'VideoNote');
+        res.json({ success: true, message: data.result });
+
+    } catch (error) {
+        console.error('Error sending video note:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * POST /api/send-voice-note 🌿
+ */
+export async function sendVoiceNote(req, res) {
+    const { chat_id, voice_note } = req.body; // voice_note should be URL to upload
+
+    if (!chat_id || !voice_note) {
+        return res.status(400).json({ error: 'chat_id and voice_note are required' });
+    }
+
+    // Must be local file to process
+    if (!voice_note.includes('/uploads/')) {
+        return res.status(400).json({ error: 'Voice note must be a locally uploaded file' });
+    }
+
+    const filename = voice_note.split('/uploads/').pop();
+    const localInputPath = path.join(appDirectory, 'public', 'uploads', filename);
+    const localOutputPath = path.join(appDirectory, 'public', 'uploads', `voice-${filename.split('.')[0]}.ogg`); // Ensure .ogg
+
+    try {
+        if (!fs.existsSync(localInputPath)) throw new Error('Input file not found');
+
+        console.log(`🎤 Processing Voice Note: ${localInputPath}...`);
+        await convertAudioToVoice(localInputPath, localOutputPath);
+        console.log(`✅ Voice Note Ready: ${localOutputPath}`);
+
+        // Send processed file
+        const form = new FormData();
+        form.append('chat_id', chat_id);
+        form.append('voice', fs.createReadStream(localOutputPath));
+
+        const response = await fetch(`${TELEGRAM_API}/sendVoice`, {
+            method: 'POST',
+            headers: form.getHeaders(),
+            body: form
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) throw new Error(data.description);
+
+        if (data.result) {
+            const processedUrl = voice_note.replace(filename, `voice-${filename.split('.')[0]}.ogg`);
+            data.result.url_voice = processedUrl;
+            if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
+        }
+
+        saveMessageLocally(data, 'Voice');
+        res.json({ success: true, message: data.result });
+
+    } catch (error) {
+        console.error('Error sending voice note:', error);
         res.status(500).json({ error: error.message });
     }
 }

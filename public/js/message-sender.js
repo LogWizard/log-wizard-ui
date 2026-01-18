@@ -137,6 +137,72 @@ async function sendVideo(chatId, videoUrl, caption = '') {
 }
 
 /**
+ * Send sticker 🌿
+ */
+async function sendSticker(chatId, stickerUrl) {
+    try {
+        const response = await fetch('/api/send-sticker', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                sticker: stickerUrl
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to send sticker');
+        return await response.json();
+    } catch (error) {
+        console.error('❌ Error sending sticker:', error);
+        throw error;
+    }
+}
+
+/**
+ * Send video note (circle) 🌿
+ */
+async function sendVideoNote(chatId, videoNoteUrl) {
+    try {
+        const response = await fetch('/api/send-video-note', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                video_note: videoNoteUrl
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to send video note');
+        return await response.json();
+    } catch (error) {
+        console.error('❌ Error sending video note:', error);
+        throw error;
+    }
+}
+
+/**
+ * Send voice note (converted audio) 🌿
+ */
+async function sendVoiceNote(chatId, voiceNoteUrl) {
+    try {
+        const response = await fetch('/api/send-voice-note', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                voice_note: voiceNoteUrl
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to send voice note');
+        return await response.json();
+    } catch (error) {
+        console.error('❌ Error sending voice note:', error);
+        throw error;
+    }
+}
+
+/**
  * Send audio/voice message
  */
 async function sendAudio(chatId, audioUrl, isVoice = false) {
@@ -350,7 +416,19 @@ async function handleSendMessage() {
         if (attachmentToSend) {
             // Send attachment with caption
             let response;
-            if (attachmentToSend.type.startsWith('image/')) {
+            const isWebm = attachmentToSend.url.endsWith('.webm') || attachmentToSend.type.includes('webm');
+            const isNoteMode = document.getElementById('videoNoteToggle')?.checked; // 🌿 Acts as "Note Mode" for both Video and Audio
+
+            if (isWebm) {
+                // 🌿 Auto-send .webm as Sticker
+                response = await sendSticker(selectedChatId, attachmentToSend.url);
+            } else if (attachmentToSend.type.startsWith('video/') && isNoteMode) {
+                // 🌿 Send as Video Note (Circle)
+                response = await sendVideoNote(selectedChatId, attachmentToSend.url);
+            } else if (attachmentToSend.type.startsWith('audio/') && isNoteMode) {
+                // 🌿 Send as Voice Note (Converted)
+                response = await sendVoiceNote(selectedChatId, attachmentToSend.url);
+            } else if (attachmentToSend.type.startsWith('image/')) {
                 response = await sendPhoto(selectedChatId, attachmentToSend.url, finalText);
             } else if (attachmentToSend.type.startsWith('video/')) {
                 response = await sendVideo(selectedChatId, attachmentToSend.url, finalText);
@@ -362,6 +440,36 @@ async function handleSendMessage() {
             // Send text only
             const response = await sendTextMessage(selectedChatId, finalText);
             if (response && response.success) sentMessage = response.message;
+        }
+
+        // 🌿 Instant UI Update (CRITICAL for Bot Messages)
+        if (sentMessage && window.chatGroups && window.chatGroups[selectedChatId]) {
+            console.log('🌿 Adding sent message to UI immediately:', sentMessage);
+
+            // Add to chat history
+            window.chatGroups[selectedChatId].messages.push(sentMessage);
+            window.chatGroups[selectedChatId].lastMessage = sentMessage; // Update last message for list sorting
+
+            // If in active chat, render it
+            if (window.selectedChatId === selectedChatId && typeof window.renderChatMessages === 'function') {
+                window.renderChatMessages(selectedChatId);
+
+                // Scroll to bottom
+                const container = document.getElementById('messages-container');
+                if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            }
+
+            // Update chat list ranking/preview if possible
+            if (typeof window.renderChatListView === 'function') {
+                window.renderChatListView();
+            }
+        }
+
+        // Clear editor
+        if (window.quill) {
+            window.quill.setText('');
+        } else {
+            const messageInput = document.getElementById('messageInput');
         }
 
         // 🌿 Instant UI Update (CRITICAL for Bot Messages)
