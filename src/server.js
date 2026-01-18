@@ -147,15 +147,16 @@ export function createMessageServer() {
 
             const messages = [];
 
-            // Якщо date пустий - сканувати ВСІ дати
+            // Якщо date пустий - сканувати останні 3 дні 🌿 (PERFORMANCE FIX!)
             let dateFolders = [];
             if (!date || date === '') {
-                // Отримуємо всі папки-дати
-                const allFolders = fs.readdirSync(MSG_PATH);
-                dateFolders = allFolders.filter(f => {
-                    const fp = path.join(MSG_PATH, f);
-                    return fs.statSync(fp).isDirectory() && /^\d{2}\.\d{2}\.\d{4}$/.test(f);
-                });
+                // 🚀 Оптимізація: читаємо тільки останні 3 дні замість всіх 129k+ файлів
+                const today = new Date();
+                for (let i = 0; i < 3; i++) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - i);
+                    dateFolders.push(d.toLocaleDateString('uk-UA'));
+                }
             } else {
                 dateFolders = [date];
             }
