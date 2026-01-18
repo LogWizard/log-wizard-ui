@@ -454,10 +454,12 @@ function initStickerPicker() {
         currentSetIndex = index;
         const setName = stickerSets[index];
 
-        // Update Tabs UI
+        // Update Tabs UI (+1 offset because children[0] is the + button)
         Array.from(tabsHeader.children).forEach((tab, i) => {
-            tab.style.color = i === index ? '#64b5f6' : '#8b98a7';
-            tab.style.background = i === index ? 'rgba(100, 181, 246, 0.1)' : 'transparent';
+            if (i === 0) return; // Skip + button
+            const setIdx = i - 1; // Actual set index
+            tab.style.color = setIdx === index ? '#64b5f6' : '#8b98a7';
+            tab.style.background = setIdx === index ? 'rgba(100, 181, 246, 0.1)' : 'transparent';
         });
 
         container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #8b98a7; padding-top: 50px;">Loading...</div>';
