@@ -4,23 +4,24 @@
  */
 
 // Custom Spoiler Blot for Telegram-style spoilers
+// Custom Spoiler Blot 🌿
 const Inline = Quill.import('blots/inline');
 
 class SpoilerBlot extends Inline {
     static create() {
         const node = super.create();
-        node.classList.add('tg-spoiler');
+        node.setAttribute('class', 'tg-spoiler');
         return node;
     }
     static formats(node) {
-        return node.classList.contains('tg-spoiler') || undefined;
+        return true; // Simple bool format
     }
 }
 SpoilerBlot.blotName = 'spoiler';
 SpoilerBlot.tagName = 'span';
 
-// Register custom blot
-Quill.register(SpoilerBlot);
+// Register cleanly
+Quill.register('formats/spoiler', SpoilerBlot);
 
 // Initialize Quill
 let quill;
@@ -40,7 +41,6 @@ function initQuillEditor() {
                 toolbar: '#quillToolbar',
                 keyboard: {
                     bindings: {
-                        // Enter to send
                         enter: {
                             key: 13,
                             handler: function () {
@@ -48,7 +48,6 @@ function initQuillEditor() {
                                 return false;
                             }
                         },
-                        // Shift+Enter for new line
                         'shift-enter': {
                             key: 13,
                             shiftKey: true,
@@ -63,19 +62,23 @@ function initQuillEditor() {
             formats: ['bold', 'italic', 'strike', 'code', 'code-block', 'blockquote', 'link', 'spoiler']
         });
 
+        // 🌿 EXPORT GLOBALLY NOW (Crucial Fix)
+        window.quill = quill;
+
         // Add spoiler button handler
         const spoilerBtn = document.querySelector('.ql-spoiler');
         if (spoilerBtn) {
-            spoilerBtn.addEventListener('click', () => {
+            spoilerBtn.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent focus loss
                 const range = quill.getSelection();
-                if (range && range.length > 0) {
+                if (range) {
                     const format = quill.getFormat(range);
                     quill.format('spoiler', !format.spoiler);
                 }
             });
         }
 
-        console.log('🌿 Quill editor initialized');
+        console.log('🌿 Quill editor initialized & Global exported');
     } catch (e) {
         console.error('Quill init error:', e);
         createFallbackInput();
