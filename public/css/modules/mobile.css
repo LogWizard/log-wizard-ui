@@ -260,21 +260,32 @@
 
     /* ===== INPUT AREA - edge-to-edge ===== */
 
-    /* Formatting toolbar on mobile - компактний стиль */
+    /* Formatting toolbar on mobile - як на PC 🌿 */
     .formatting-toolbar {
         display: flex !important;
-        padding: 4px 8px;
-        gap: 6px;
-        justify-content: center;
+        width: 100%;
+        padding: 6px 12px;
+        gap: 5px;
+        justify-content: flex-start;
         background-color: #17212b;
         border-top: 1px solid rgba(43, 82, 120, 0.5);
         flex-shrink: 0;
     }
 
     .formatting-toolbar button {
-        padding: 6px 8px;
-        font-size: 12px;
-        min-width: 28px;
+        padding: 8px 12px;
+        font-size: 13px;
+        background-color: #242f3d;
+        border: none;
+        border-radius: 6px;
+        color: #8b98a7;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .formatting-toolbar button:hover {
+        background-color: #2b5278;
+        color: #fff;
     }
 
     .message-input-wrapper {
