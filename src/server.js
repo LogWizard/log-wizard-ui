@@ -53,7 +53,13 @@ const fileTypes = {
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
     '.pdf': 'application/pdf',
-    '.woff2': 'font/woff2'
+    '.woff2': 'font/woff2',
+    '.webp': 'image/webp',
+    '.mp3': 'audio/mpeg',
+    '.ogg': 'audio/ogg',
+    '.wav': 'audio/wav',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm'
 };
 let MSG_PATH = "";
 let port = "";
@@ -273,7 +279,7 @@ export function createMessageServer() {
     /* Цей роутер відповідає за обробку запиту /chat */
 
     /* Цей роутер відповідає за обробку всіх інших запитів */
-    app.get(/^\/(css|fonts|js)\//i, (req, res) => {
+    app.get(/^\/(css|fonts|js|uploads)\//i, (req, res) => {
         // Use req.path to ignore query parameters like ?v=2 🌿
         const filePath = path.join(appDirectory, 'public', req.path);
         const fileExtension = path.extname(filePath);
