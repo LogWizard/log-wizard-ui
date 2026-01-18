@@ -47,12 +47,21 @@ app.get('/api/get-user-photo', async (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).send('User ID required');
 
+    console.log(`📸 Fetching avatar for user: ${userId}`);
     const paramsOnConfig = await configManager.read();
     const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
+    if (!token) {
+        console.error('❌ Bot token is missing in environment or config!');
+        return res.status(500).send('Bot token missing');
+    }
+
     try {
-        const response = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+        const profileUrl = `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`;
+        const response = await fetch(profileUrl);
         const data = await response.json();
+
+        console.log(`📸 Telegram response for ${userId}:`, data.ok ? `OK, Photos: ${data.result?.total_count}` : `Error: ${data.description}`);
 
         if (data.ok && data.result.total_count > 0) {
             const fileId = data.result.photos[0][0].file_id;

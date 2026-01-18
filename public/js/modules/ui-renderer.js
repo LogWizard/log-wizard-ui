@@ -516,11 +516,14 @@ function createMessageBubble(msg, type) {
             const emoji = r.type?.emoji || r.emoji || '❤️';
             const count = r.total_count || r.count || 1;
             const isOwn = r.is_own || false; // Check local flag
-            const bgStyle = isOwn ? 'background: rgba(100, 181, 246, 0.3); border: 1px solid rgba(100, 181, 246, 0.5);' : 'background: rgba(255, 255, 255, 0.08);';
+            // 🌿 Brighter styling for visibility
+            const bgStyle = isOwn
+                ? 'background: rgba(59, 130, 246, 0.4); border: 1px solid rgba(100, 181, 246, 0.6); color: white;'
+                : 'background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); color: #e0e0e0;';
 
-            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 14px; font-size: 14px; margin-right: 4px; ${bgStyle} cursor: pointer;">${emoji}${count > 1 ? `<span style="font-size: 12px; opacity: 0.8;">${count}</span>` : ''}</span>`;
+            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 16px; font-size: 14px; font-weight: 500; margin-right: 4px; ${bgStyle} cursor: pointer; transition: all 0.2s;">${emoji}${count > 1 ? `<span style="font-size: 12px; margin-left: 2px;">${count}</span>` : ''}</span>`;
         }).join('');
-        reactionsHtml = `<div class="message-reactions" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">${reactionItems}</div>`;
+        reactionsHtml = `<div class="message-reactions" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 5;">${reactionItems}</div>`;
     }
 
     // Reaction button (add reaction) 🌿
