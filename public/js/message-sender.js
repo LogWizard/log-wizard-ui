@@ -236,7 +236,14 @@ function initMessageInput() {
 /**
  * Handle send message - підтримка Quill WYSIWYG 🌿
  */
+let isSending = false; // 🌿 Module-level lock
+
+/**
+ * Handle send message - підтримка Quill WYSIWYG 🌿
+ */
 async function handleSendMessage() {
+    if (isSending) return; // 🛡️ Prevent double submit
+
     // Support both Quill and legacy input
     let text = '';
     let htmlText = '';
@@ -262,6 +269,18 @@ async function handleSendMessage() {
         return;
     }
 
+    // 🛡️ Lock UI
+    isSending = true;
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.style.opacity = '0.5';
+
+    // Capture Attachment & Clear State IMMEDIATELY 🌿
+    const attachmentToSend = pendingAttachment;
+    if (attachmentToSend) {
+        pendingAttachment = null;
+        updateAttachmentPreview();
+    }
+
     // Convert Quill HTML to Telegram HTML using DOM 🌿
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlText;
@@ -273,7 +292,7 @@ async function handleSendMessage() {
         el.replaceWith(spoiler);
     });
 
-    // 2. Handle Highlights (Convert to Bold with Emoji 🖍️)
+    // 2. Handle Highlights (Convert to Bold with Emoji 🖍️) - Left for compatibility if old posts exist
     tempDiv.querySelectorAll('.tg-highlight').forEach(el => {
         const b = document.createElement('b');
         b.innerHTML = '🖍️ ' + el.innerHTML;
@@ -282,7 +301,6 @@ async function handleSendMessage() {
 
     // 3. Unwrap ALL other SPANS (Telegram hates spans) 🚫
     tempDiv.querySelectorAll('span').forEach(el => {
-        // Just replace with its content
         el.replaceWith(...el.childNodes);
     });
 
@@ -292,16 +310,13 @@ async function handleSendMessage() {
         const tag = el.tagName.toLowerCase();
 
         if (!allowedTags.includes(tag) && tag !== 'br' && tag !== 'p') {
-            // Unwrap unknown tags (including divs, spans, font, etc.)
             el.replaceWith(...el.childNodes);
         } else {
-            // Remove all attributes except href for <a>
             if (tag === 'a') {
                 const href = el.getAttribute('href');
                 while (el.attributes.length > 0) el.removeAttribute(el.attributes[0].name);
                 if (href) el.setAttribute('href', href);
             } else {
-                // Remove all attributes for others
                 while (el.attributes.length > 0) el.removeAttribute(el.attributes[0].name);
             }
         }
@@ -314,7 +329,7 @@ async function handleSendMessage() {
         .replace(/<\/p>/g, '\n')
         .replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>')
         .replace(/<em>/g, '<i>').replace(/<\/em>/g, '</i>')
-        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>') // Redundant but safe
+        .replace(/<s>/g, '<s>').replace(/<\/s>/g, '</s>')
         .replace(/<pre class="ql-syntax"[^>]*>/g, '<pre>').replace(/<\/pre>/g, '</pre>')
         .replace(/<blockquote>/g, '❝ ').replace(/<\/blockquote>/g, '\n')
         .replace(/<br>/g, '\n')
@@ -324,51 +339,18 @@ async function handleSendMessage() {
     telegramHtml = telegramHtml.replace(/\n\n+/g, '\n\n').trim();
 
     // Use plain text if no HTML formatting
-    const finalText = telegramHtml.includes('<') ? telegramHtml : text;
+    const finalText = telegramHtml.includes('<') ? telegramHtml : telegramHtml; // Always use what we prepared (HTML)
 
     try {
-        /* 🌿 Optimistic UI Update DISABLED (Let "The Goose" handle it) 
-        const tempMsg = {
-            message_id: 'temp-' + Date.now(),
-            from: { id: 'bot', first_name: 'Gys Bot 🦆', is_bot: true },
-            chat: { id: selectedChatId },
-            time: new Date().toISOString(),
-            text: finalText,
-            manual: true
-        };
-
-        // Update globals if available
-        if (window.allMessages && window.chatGroups && window.renderChatMessages) {
-            window.allMessages.push(tempMsg);
-
-            if (window.chatGroups[selectedChatId]) {
-                window.chatGroups[selectedChatId].messages.push(tempMsg);
-                window.chatGroups[selectedChatId].lastMessage = tempMsg;
-                window.renderChatMessages(selectedChatId);
-
-                if (typeof window.renderChatListView === 'function') {
-                    window.renderChatListView();
-                }
-
-                const container = document.getElementById('messages-container');
-                if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-            }
-        }
-        */
-
-        if (pendingAttachment) {
+        if (attachmentToSend) {
             // Send attachment with caption
-            if (pendingAttachment.type.startsWith('image/')) {
-                await sendPhoto(selectedChatId, pendingAttachment.url, finalText);
-            } else if (pendingAttachment.type.startsWith('video/')) {
-                await sendVideo(selectedChatId, pendingAttachment.url, finalText);
-            } else if (pendingAttachment.type.startsWith('audio/')) {
-                await sendAudio(selectedChatId, pendingAttachment.url, pendingAttachment.type.includes('ogg'));
+            if (attachmentToSend.type.startsWith('image/')) {
+                await sendPhoto(selectedChatId, attachmentToSend.url, finalText);
+            } else if (attachmentToSend.type.startsWith('video/')) {
+                await sendVideo(selectedChatId, attachmentToSend.url, finalText);
+            } else if (attachmentToSend.type.startsWith('audio/')) {
+                await sendAudio(selectedChatId, attachmentToSend.url, attachmentToSend.type.includes('ogg'));
             }
-
-            // Clear attachment
-            pendingAttachment = null;
-            updateAttachmentPreview();
         } else {
             // Send text only
             await sendTextMessage(selectedChatId, finalText);
@@ -385,6 +367,14 @@ async function handleSendMessage() {
         console.log('📤 Message sent successfully');
     } catch (error) {
         alert('Помилка відправки: ' + error.message);
+        // Restore attachment on error?
+        if (attachmentToSend) {
+            pendingAttachment = attachmentToSend;
+            updateAttachmentPreview();
+        }
+    } finally {
+        isSending = false;
+        if (sendBtn) sendBtn.style.opacity = '1';
     }
 }
 
@@ -457,20 +447,6 @@ function initDragAndDrop() {
     window.handleSendMessage = handleSendMessage;
     window.handleAttachFile = handleAttachFile;
     window.updateAttachmentPreview = updateAttachmentPreview;
-
-    // Initialize when DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-        initMessageInput();
-        // Also re-bind send button explicitly just in case
-        const sendBtn = document.getElementById('sendBtn');
-        if (sendBtn) {
-            sendBtn.onclick = (e) => {
-                e.preventDefault();
-                console.log('👉 Send button clicked');
-                handleSendMessage();
-            };
-        }
-    });
 
     messagesPanel.addEventListener('dragover', (e) => {
         e.preventDefault();

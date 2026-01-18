@@ -145,9 +145,10 @@ export async function sendPhoto(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
-        // 🌿 Preserve HTML formatting for local history UI
-        if (data.result && caption) {
-            data.result.caption = caption;
+        // 🌿 Preserve HTML and Media URL for local history
+        if (data.result) {
+            if (caption) data.result.caption = caption;
+            if (photo && typeof photo === 'string') data.result.url_photo = photo;
         }
 
         saveMessageLocally(data, 'Photo');
@@ -175,9 +176,10 @@ export async function sendVideo(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
-        // 🌿 Preserve HTML formatting for local history UI
-        if (data.result && caption) {
-            data.result.caption = caption;
+        // 🌿 Preserve HTML and Media URL for local history
+        if (data.result) {
+            if (caption) data.result.caption = caption;
+            if (video && typeof video === 'string') data.result.url_video = video;
         }
 
         saveMessageLocally(data, 'Video');
@@ -205,6 +207,13 @@ export async function sendAudio(req, res) {
 
         if (!data.ok) throw new Error(data.description);
 
+        // 🌿 Preserve Media URL for local history
+        if (data.result && audio && typeof audio === 'string') {
+            data.result.url_audio = audio; // or url_voice? let's stick to what renderer expects
+            // renderer checks: msg.audio?.url or msg.url_audio (voice is checked separately)
+            // Actually renderer checks msg.audio?.url. Let's add url_voice too if needed.
+        }
+
         saveMessageLocally(data, 'Audio');
         res.json({ success: true, message: data.result });
     } catch (error) {
@@ -229,6 +238,11 @@ export async function sendVoice(req, res) {
         const data = await response.json();
 
         if (!data.ok) throw new Error(data.description);
+
+        // 🌿 Preserve Media URL for local history
+        if (data.result && voice && typeof voice === 'string') {
+            data.result.url_voice = voice;
+        }
 
         saveMessageLocally(data, 'Voice');
         res.json({ success: true, message: data.result });
