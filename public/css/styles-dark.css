@@ -1134,3 +1134,80 @@ body {
 .task-item::before {
   content: '▫️';
 }
+/* Transparent Stickers */
+.message-bubble.sticker-only {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    max-width: 256px !important; /* Limit sticker size */
+}
+
+.message-bubble.sticker-only .message-sticker, 
+.message-bubble.sticker-only .message-animation {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100%;
+}
+
+.message-bubble.sticker-only img.sticker,
+.message-bubble.sticker-only video.sticker,
+.message-bubble.sticker-only video.animation,
+.message-bubble.sticker-only tgs-player {
+    border-radius: 0 !important;
+    display: block;
+    max-width: 100%;
+}
+
+.message-bubble.sticker-only .message-footer {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: white;
+    font-size: 10px;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+}
+/* Ensure reactions are visible below sticker if any */
+.message-bubble.sticker-only .message-reactions {
+    margin-top: 5px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 16px;
+    padding: 2px 6px;
+    display: inline-flex;
+    backdrop-filter: blur(4px);
+}
+
+/* Header Avatar Style */
+.chat-header .chat-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chat-header #activeChatAvatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #2b5278;
+    color: white;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    overflow: hidden;
+    flex-shrink: 0;
+    margin-right: -5px; /* Adjust gap */
+}
+
+/* Ensure images fill the avatar container */
+.chat-header #activeChatAvatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+

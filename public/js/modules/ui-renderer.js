@@ -213,6 +213,11 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
     if (!chat) return;
     const container = state.ui.messagesContainer;
 
+    // 🌿 Header Update
+    if (state.ui.activeChatName) state.ui.activeChatName.textContent = chat.name || 'Chat';
+    if (state.ui.activeChatStatus) state.ui.activeChatStatus.textContent = `${chat.messages.length} messages`;
+    updateHeaderAvatar(chat);
+
     if (lastRenderedChatId !== chatId || forceClear) {
         container.innerHTML = '';
         renderedMessageIds.clear();
@@ -312,9 +317,18 @@ function appendMessage(msg, container, lastDate, setLastDate) {
 }
 
 function createMessageBubble(msg, type) {
-    console.log('DEBUG: Rendering message:', msg);
+    // console.log('DEBUG: Rendering message:', msg); 
     const div = document.createElement('div');
-    div.className = `message-bubble ${type}`;
+
+    // 🎨 Sticker-only Logic 🌿
+    const stickerSrc = msg.url_sticker || msg.url_animated_sticker || msg.sticker?.url || (typeof msg.sticker === 'string' ? msg.sticker : null);
+    const animSrc = msg.url_animation || msg.animation?.url || (typeof msg.animation === 'string' ? msg.animation : null);
+    const hasText = !!msg.text || !!msg.caption;
+
+    // If it's pure media (sticker/animation) without text, mark as sticker-only
+    const isStickerOnly = (stickerSrc || animSrc) && !hasText;
+
+    div.className = `message-bubble ${type} ${isStickerOnly ? 'sticker-only' : ''}`;
 
     const time = safeParseDate(msg.time);
     const timeStr = time.getTime() === 0 ? '' : time.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
@@ -358,7 +372,6 @@ function createMessageBubble(msg, type) {
     }
 
     // 🎨 Sticker (static and animated)
-    const stickerSrc = msg.url_sticker || msg.url_animated_sticker || msg.sticker?.url || (typeof msg.sticker === 'string' ? msg.sticker : null);
     if (stickerSrc) {
         // Check if it's animated (TGS or WEBM)
         if (stickerSrc.includes('.tgs') || msg.sticker?.is_animated) {
@@ -374,7 +387,6 @@ function createMessageBubble(msg, type) {
     }
 
     // 🎬 Animation (GIF)
-    const animSrc = msg.url_animation || msg.animation?.url || (typeof msg.animation === 'string' ? msg.animation : null);
     if (animSrc) {
         mediaHtml += `<div class="message-animation message-media"><video src="${animSrc}" class="animation" autoplay loop muted playsinline></video></div>`;
     }
@@ -801,3 +813,36 @@ document.addEventListener('click', async (e) => {
         }, 100);
     }
 });
+
+// 🌿 Header Avatar Update
+function updateHeaderAvatar(chat) {
+    const avatarEl = document.getElementById('activeChatAvatar');
+    if (!avatarEl) return;
+
+    // Determine ID and Type
+    const chatId = String(chat.id);
+    const isGroup = chatId.startsWith('-'); // Simple heuristic
+
+    // Initial Placeholder
+    const color = getColorForUser(chatId); // Use helper
+    const letter = (chat.name || 'C').charAt(0).toUpperCase();
+
+    // Reset classes/style to Ensure circular shape from CSS or inline
+    avatarEl.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ${color}; border-radius: 50%; color: white; font-weight: bold;">${letter}</div>`;
+
+    // Try Asynchronous Load (Only for private chats primarily, unless we add getChat for groups)
+    if (!isGroup) {
+        // Use timeout to not block rendering
+        setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/get-user-photo?user_id=${chatId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) {
+                        avatarEl.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+                    }
+                }
+            } catch (e) { /* Silent fail */ }
+        }, 0);
+    }
+}
