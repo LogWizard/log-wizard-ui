@@ -292,6 +292,8 @@ body {
   display: flex;
   flex-direction: column;
   background-color: #0e1621;
+  position: relative;
+  /* Fix for absolute children positioning 🌿 */
 }
 
 .messages-header {

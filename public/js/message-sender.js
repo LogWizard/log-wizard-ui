@@ -362,16 +362,31 @@ function initStickerPicker() {
     // Fetch Sets Function
     async function loadSets() {
         try {
-            const res = await fetch('/api/sticker-sets');
-            const data = await res.json();
-            stickerSets = data.map(s => s.name);
-
-            // Clear old tabs (except + button)
-            while (tabsHeader.childNodes.length > 1) {
-                tabsHeader.removeChild(tabsHeader.childNodes[1]); // Remove tabs, keep + at index 0? Wait, + is appended last? 
-                // Actually let's just rebuild mostly.
+            let sets = [];
+            try {
+                const res = await fetch('/api/sticker-sets');
+                if (res.ok) {
+                    const data = await res.json();
+                    sets = data.map(s => s.name);
+                }
+            } catch (e) {
+                console.error('API Error, using fallback', e);
             }
-            // Or better: clear all and re-add +
+
+            // Fallback if DB empty or failed 🌿
+            if (!sets || sets.length === 0) {
+                console.warn('⚠️ No sets from DB, using fallback defaults.');
+                sets = [
+                    'Brilevsky',
+                    'VikostVSpack',
+                    'horoshok_k_by_fStikBot',
+                    'CystsDribsAssai_by_fStikBot'
+                ];
+            }
+
+            stickerSets = sets;
+
+            // Clear old tabs (except + button logic handled inside rebuild)
             tabsHeader.innerHTML = '';
 
             // Re-add import button
@@ -402,13 +417,19 @@ function initStickerPicker() {
                 tab.title = set;
                 tab.style.cssText = 'padding: 5px 10px; cursor: pointer; font-size: 12px; color: #8b98a7; white-space: nowrap; border-radius: 10px; transition: all 0.2s;';
 
+                // Active state logic
+                if (index === currentSetIndex) {
+                    tab.style.color = '#64b5f6';
+                    tab.style.background = 'rgba(100, 181, 246, 0.1)';
+                }
+
                 tab.onclick = () => loadStickerSet(index);
                 tabsHeader.appendChild(tab);
             });
 
-            if (stickerSets.length > 0) {
-                // Auto load first only if requested?
-                // loadStickerSet(0);
+            // Auto-load first set if none loaded
+            if (stickerSets.length > 0 && !loadedSets[stickerSets[currentSetIndex]]) {
+                loadStickerSet(currentSetIndex);
             }
         } catch (e) {
             console.error('Failed to load sets', e);
