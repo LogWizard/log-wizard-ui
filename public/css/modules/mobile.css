@@ -1,0 +1,445 @@
+/* Mobile Back Button */
+.mobile-back-btn {
+    background: none;
+    border: none;
+    color: #8b98a7;
+    cursor: pointer;
+    padding: 8px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.mobile-back-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* Mobile Responsiveness 📱🌿 */
+@media (max-width: 768px) {
+
+    /* ===== RESET - прибираємо все зайве ===== */
+    * {
+        box-sizing: border-box;
+    }
+
+    /* Main container - повна ширина без gaps */
+    .telegram-container {
+        position: relative;
+        overflow: hidden;
+        width: 100vw;
+        max-width: 100vw;
+    }
+
+    /* Chat List Panel - full width, absolute */
+    .chat-list-panel {
+        width: 100vw !important;
+        min-width: 100vw !important;
+        max-width: 100vw !important;
+        position: absolute;
+        z-index: 10;
+        height: 100vh;
+        height: 100dvh;
+        left: 0;
+        top: 0;
+        transition: transform 0.3s ease;
+        transform: translateX(0);
+    }
+
+    /* Messages Panel - full width */
+    .messages-panel {
+        width: 100vw !important;
+        min-width: 100vw !important;
+        max-width: 100vw !important;
+        position: absolute;
+        z-index: 20;
+        height: 100vh;
+        height: 100dvh;
+        left: 0;
+        top: 0;
+        transform: translateX(100vw);
+        transition: transform 0.3s ease;
+        background-color: #0e1621;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Active Chat State */
+    body.mobile-chat-active .chat-list-panel {
+        transform: translateX(-30%);
+    }
+
+    body.mobile-chat-active .messages-panel {
+        transform: translateX(0);
+    }
+
+    /* ===== HEADER - Telegram стиль ===== */
+    .mobile-back-btn {
+        display: flex !important;
+        margin-right: 12px;
+    }
+
+    .messages-header {
+        padding: 10px 12px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        background-color: #17212b;
+        border-bottom: 1px solid #2b5278;
+        flex-shrink: 0;
+    }
+
+    .chat-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chat-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .chat-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chat-name {
+        font-size: 15px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-status {
+        font-size: 12px;
+        color: #8b98a7;
+    }
+
+    /* Hide manual mode toggle on mobile */
+    .manual-mode-toggle {
+        display: none !important;
+    }
+
+    /* ===== MESSAGES CONTAINER ===== */
+    .messages-container {
+        flex: 1;
+        width: 100% !important;
+        padding: 8px 8px 8px 8px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* ===== MESSAGE BUBBLES - як на PC ===== */
+    .message-group {
+        margin-bottom: 4px;
+    }
+
+    .message-bubble {
+        display: flex;
+        margin-bottom: 2px;
+        position: relative;
+    }
+
+    .message-bubble .bubble-content {
+        max-width: 85%;
+        padding: 8px 12px;
+        border-radius: 12px;
+        position: relative;
+        word-wrap: break-word;
+        word-break: break-word;
+    }
+
+    /* Client messages - зліва, сірий фон */
+    .message-bubble.client {
+        justify-content: flex-start;
+    }
+
+    .message-bubble.client .bubble-content {
+        background-color: #182533;
+        border-radius: 12px 12px 12px 4px;
+        margin-right: auto;
+    }
+
+    /* Bot messages - справа, синій фон */
+    .message-bubble.bot {
+        justify-content: flex-end;
+    }
+
+    .message-bubble.bot .bubble-content {
+        background-color: #2b5278;
+        border-radius: 12px 12px 4px 12px;
+        margin-left: auto;
+    }
+
+    /* Message text */
+    .message-text {
+        font-size: 14px;
+        line-height: 1.4;
+        color: #e0e0e0;
+    }
+
+    /* Sender name inside bubble */
+    .message-sender {
+        font-size: 13px;
+        font-weight: 500;
+        color: #5288c1;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    /* Message time */
+    .message-time {
+        font-size: 11px;
+        color: #8b98a7;
+        margin-top: 4px;
+    }
+
+    /* Date separators */
+    .message-date-separator {
+        text-align: center;
+        margin: 12px 0;
+    }
+
+    .date-badge {
+        display: inline-block;
+        background-color: rgba(82, 136, 193, 0.2);
+        color: #8b98a7;
+        padding: 4px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    /* Message pre/code */
+    .message-bubble pre {
+        max-width: 100%;
+        overflow-x: auto;
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 6px 8px;
+        margin: 4px 0;
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Media in messages */
+    .message-media img,
+    .message-media video {
+        max-width: 100% !important;
+        height: auto !important;
+        border-radius: 8px;
+        margin-top: 4px;
+    }
+
+    /* Stickers */
+    .message-sticker img,
+    .message-sticker video {
+        max-width: 140px !important;
+        height: auto !important;
+    }
+
+    /* ===== INPUT AREA - edge-to-edge ===== */
+
+    /* Hide formatting toolbar on mobile - занадто cluttered */
+    .formatting-toolbar {
+        display: none !important;
+    }
+
+    .message-input-wrapper {
+        width: 100%;
+        padding: 8px 8px;
+        background-color: #17212b;
+        border-top: 1px solid #2b5278;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .message-input {
+        flex: 1;
+        border-radius: 20px;
+        padding: 10px 16px;
+        font-size: 15px;
+        background-color: #0e1621;
+        border: 1px solid #2b5278;
+        color: #fff;
+    }
+
+    .message-input:focus {
+        border-color: #5288c1;
+        outline: none;
+    }
+
+    .attach-btn,
+    .send-btn {
+        padding: 8px;
+        flex-shrink: 0;
+    }
+
+    .attach-btn svg,
+    .send-btn svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    /* ===== CHAT LIST ===== */
+    .chat-list-header {
+        padding: 12px 12px;
+    }
+
+    .chat-list-header h2 {
+        font-size: 18px;
+    }
+
+    .search-bar-wrapper {
+        padding: 8px 12px;
+    }
+
+    .search-input-group {
+        padding: 8px 12px;
+        border-radius: 20px;
+    }
+
+    .view-toggle {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+
+    .view-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 16px;
+    }
+
+    .chat-item {
+        padding: 10px 12px;
+        width: 100%;
+    }
+
+    .chat-item-avatar {
+        width: 44px;
+        height: 44px;
+    }
+
+    .chat-item-name {
+        font-size: 14px;
+    }
+
+    .chat-item-preview {
+        font-size: 12px;
+    }
+
+    .chat-item-time {
+        font-size: 10px;
+    }
+
+    /* ===== REACTIONS ===== */
+    .message-reactions {
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .reaction-badge {
+        border-radius: 10px;
+        padding: 2px 6px;
+        font-size: 11px;
+    }
+
+    /* ===== AUDIO PLAYER ===== */
+    .audio-player {
+        width: 180px;
+    }
+
+    /* ===== VIDEO NOTE ===== */
+    .video_note,
+    .circular-progress {
+        width: 160px !important;
+        height: 160px !important;
+    }
+
+    /* ===== SCROLLBAR ===== */
+    .messages-container::-webkit-scrollbar {
+        width: 3px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+    }
+
+    .chat-list::-webkit-scrollbar {
+        width: 3px;
+    }
+
+    .chat-list::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+    }
+
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .scroll-to-bottom {
+        bottom: 80px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+    }
+
+    /* ===== JSON SPOILER ===== */
+    .json-spoiler {
+        margin-top: 6px;
+    }
+
+    .json-spoiler summary {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+
+    .json-spoiler pre {
+        max-height: 150px;
+        font-size: 9px;
+    }
+
+    /* ===== HIDE UNNECESSARY ELEMENTS ===== */
+    .view-switcher {
+        display: none !important;
+    }
+}
+
+/* ===== Extra small screens ===== */
+@media (max-width: 400px) {
+    .message-bubble .bubble-content {
+        max-width: 90%;
+        padding: 6px 10px;
+    }
+
+    .chat-list-header h2 {
+        font-size: 16px;
+    }
+
+    .messages-container {
+        padding: 6px;
+    }
+
+    .message-input-wrapper {
+        padding: 6px;
+    }
+
+    .chat-item {
+        padding: 8px 10px;
+    }
+
+    .chat-item-avatar {
+        width: 40px;
+        height: 40px;
+    }
+}

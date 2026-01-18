@@ -3,26 +3,32 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/css/styles-dark.css">
+    <link rel="stylesheet" href="/css/modules/message-input.css">
+    <link rel="stylesheet" href="/css/modules/manual-mode.css">
+    <link rel="stylesheet" href="/css/modules/mobile.css">
     <link rel="stylesheet" href="/css/emojione.min.css">
     <link rel="stylesheet" href="/css/prism-dark.css">
-    <!-- <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/smoothness/jquery-ui.css"> -->
     <link rel="stylesheet" href="/css/jquery-ui-dark.css">
     <link href="/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.css">
+    <link rel="stylesheet" href="/css/vanilla-calendar-theme.css">
+
     <script src="/js/jquery-3.5.1.min.js"></script>
     <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
     <script src="/js/select2.min.js"></script>
-
     <script src="/js/emojione.min.js"></script>
     <script src="/js/tgs-player.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-
-    <title>Chat history</title>
+    <title>Gys Bot Debug 🦆</title>
 
 </head>
+
+<!-- Settings Dialog -->
 <div style="display: none;" id="dialog" title="Settings">
     <div id="display-settings">
         <h3>Display Settings</h3>
@@ -30,13 +36,11 @@
             <label for="selectDate">Select Date:</label>
             <input type="date" name="selectDate" id="selectDate" class="text ui-widget-content ui-corner-all">
 
-            <label id="groupsSelectLabel" style="display: none;" for="selectGroupChat">Select chat:</label>
-            <select style="display: none;" id="groupsSelect" class="js-example-basic-single" name="state">
+            <label for="viewMode">View Mode:</label>
+            <select id="viewMode" class="text ui-widget-content ui-corner-all">
+                <option value="chat">Chat View (по людям)</option>
+                <option value="timeline">Timeline View (всі разом)</option>
             </select>
-
-            <label for="updateInterval">Update Interval:</label>
-            <input type="number" name="updateInterval" id="updateInterval" min="60" max="3600" step="60" value=""
-                class="text ui-widget-content ui-corner-all">
         </form>
     </div>
 
@@ -62,16 +66,156 @@
 
 
 <body>
-    <div id="chat-widget">
-        <div class="shoutbox">
-            <h1 id="historyDate"><button id="settings-btn" class="settings-btn">Settings</button>Last Update: </h1>
-            <input style="display: none;" type="date" name="selectDateWidget" id="selectDateWidget"
-                class="text ui-widget-content ui-corner-all">
-            <ul id="chat-messages" class="shoutbox-content">
-            </ul>
+    <!-- Telegram-style Layout 🌿🦆 -->
+    <div class="telegram-container">
+        <!-- Left Sidebar - Chat List -->
+        <div class="chat-list-panel">
+            <div class="chat-list-header">
+                <h2>Chats</h2>
+                <button id="settings-btn" class="settings-icon-btn" title="Налаштування">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Search Bar з календарем 🌿 -->
+            <div class="search-bar-wrapper">
+                <div class="search-input-group">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="chatSearch" placeholder="Пошук чатів..." class="search-input">
+                    <button id="calendarToggle" class="calendar-icon-btn" title="Обрати дату">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div id="selectedDateBadge" class="selected-date-badge" style="display: none;">
+                    <span id="selectedDateText"></span>
+                    <button id="clearDateFilter" class="clear-date-btn">×</button>
+                </div>
+            </div>
+
+            <div class="view-toggle">
+                <button id="chatViewBtn" class="view-btn active">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Chat
+                </button>
+                <button id="timelineViewBtn" class="view-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    Timeline
+                </button>
+                <button id="statsViewBtn" class="view-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Stats
+                </button>
+            </div>
+            <div id="chat-list" class="chat-list">
+                <!-- Chat items will be injected here -->
+            </div>
+        </div>
+
+        <!-- Right Panel - Messages -->
+        <div class="messages-panel">
+            <div class="messages-header">
+                <!-- Mobile Back Button 📱 -->
+                <button id="mobileBackBtn" class="mobile-back-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                </button>
+
+                <div class="chat-info">
+                    <div class="chat-avatar">👤</div>
+                    <div class="chat-details">
+                        <div class="chat-name" id="activeChatName">Select a chat</div>
+                        <div class="chat-status" id="activeChatStatus">-</div>
+                    </div>
+                </div>
+
+                <!-- Manual Mode Toggle -->
+                <div class="manual-mode-toggle">
+                    <span class="toggle-label auto" id="toggleLabel">
+                        <svg class="toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c.79 0 1.5-.71 1.5-1.5S8.79 9 8 9s-1.5.71-1.5 1.5S7.21 11 8 11zm8 0c.79 0 1.5-.71 1.5-1.5S16.79 9 16 9s-1.5.71-1.5 1.5.71 1.5 1.5 1.5zm-4 4c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4z" />
+                        </svg>
+                        Auto
+                    </span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="manualModeToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div id="messages-container" class="messages-container">
+                <!-- Messages will be injected here -->
+            </div>
+
+            <button id="scrollToBottomBtn" class="scroll-to-bottom" title="Scroll to bottom">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 14l-7 7-7-7M19 8l-7-7-7 7" />
+                </svg>
+            </button>
+
+            <!-- Formatting Toolbar 🌿 -->
+            <div class="formatting-toolbar">
+                <button onclick="insertFormatting('bold')" title="Bold"><b>B</b></button>
+                <button onclick="insertFormatting('italic')" title="Italic"><i>I</i></button>
+                <button onclick="insertFormatting('code')" title="Code">&lt;/&gt;</button>
+                <button onclick="insertFormatting('pre')" title="Pre">Pre</button>
+                <button onclick="insertFormatting('link')" title="Link">🔗</button>
+                <button onclick="insertFormatting('spoiler')" title="Spoiler">👁️</button>
+            </div>
+
+            <!-- Message Input 🌿 -->
+            <div class="message-input-wrapper">
+                <button id="attachBtn" class="attach-btn" title="Прикріпити файл">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                        </path>
+                    </svg>
+                </button>
+                <input type="text" id="messageInput" class="message-input" placeholder="Написати повідомлення..." />
+                <button id="sendBtn" class="send-btn" title="Відправити (Enter)">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
-    <script src="/js/main.js"></script>
+
+    <input style="display: none;" type="date" name="selectDateWidget" id="selectDateWidget"
+        class="text ui-widget-content ui-corner-all">
+
+    <script src="/js/message-sender.js"></script>
+    <script type="module" src="/js/main.js"></script>
     <script src="/js/audio-player.js"></script>
     <script src="/js/prism.js"></script>
 </body>
