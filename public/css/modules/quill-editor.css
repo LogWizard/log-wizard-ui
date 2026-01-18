@@ -5,8 +5,8 @@
     flex: 1;
     min-height: 42px;
     max-height: 150px;
-    background-color: #0e1621;
-    /* Dark background */
+    background-color: #080b10;
+    /* Darker background 🌿 */
     border: 1px solid #2b5278;
     /* Subtle blue border */
     border-radius: 20px;
@@ -48,8 +48,8 @@
 }
 
 .ql-editor.ql-blank::before {
-    color: #6b7280 !important;
-    /* Placeholder color */
+    color: #6c7883 !important;
+    /* Lighter placeholder 🌿 */
     font-style: normal !important;
     left: 16px !important;
     right: 16px !important;
@@ -57,8 +57,8 @@
 
 /* Toolbar Styling - Bottom Bar */
 .ql-toolbar.ql-snow {
-    border-top: 1px solid #1c2a38 !important;
-    /* Subtle separator */
+    border-top: 1px solid #232e3a !important;
+    /* Better blending border */
     padding: 4px 8px !important;
     display: flex !important;
     flex-wrap: wrap;
