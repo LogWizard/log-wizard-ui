@@ -403,10 +403,28 @@ function initDragAndDrop() {
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            <p>Перетягніть файл сюди</p>
         </div>
     `;
     document.body.appendChild(overlay);
+
+    // Explicitly export to window for external access 🌿
+    window.handleSendMessage = handleSendMessage;
+    window.handleAttachFile = handleAttachFile;
+    window.updateAttachmentPreview = updateAttachmentPreview;
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        initMessageInput();
+        // Also re-bind send button explicitly just in case
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) {
+            sendBtn.onclick = (e) => {
+                e.preventDefault();
+                console.log('👉 Send button clicked');
+                handleSendMessage();
+            };
+        }
+    });
 
     messagesPanel.addEventListener('dragover', (e) => {
         e.preventDefault();

@@ -5,10 +5,9 @@
     flex: 1;
     min-height: 42px;
     max-height: 150px;
-    background-color: #080b10;
-    /* Darker background */
+    background-color: transparent !important;
+    /* Transparent to let wrapper BG show 🌿 */
     border: none;
-    /* Controlled by wrapper */
     border-radius: 0 !important;
     /* Fix bottom gap issue 🌿 */
     color: #fff;
@@ -17,6 +16,13 @@
     flex-direction: column;
     overflow: hidden;
     /* Contains toolbar within rounded corners if needed */
+}
+
+/* Make wrapper handle background to fix corners */
+.message-input-wrapper {
+    background-color: #080b10 !important;
+    overflow: hidden;
+    /* Clips children to rounded corners */
 }
 
 /* Remove default Quill borders and backgrounds (Snow Theme Override) */
@@ -168,27 +174,31 @@
 }
 
 /* Custom Spoiler Style - VISIBLE 👁️ */
+/* Custom Spoiler Style - EXTREMELY VISIBLE 👁️ */
 .ql-editor .tg-spoiler {
-    background: repeating-linear-gradient(45deg,
+    background-image: repeating-linear-gradient(-45deg,
             #4a5568,
-            #4a5568 10px,
-            #2d3748 10px,
-            #2d3748 20px);
-    color: transparent;
-    /* Text hidden */
+            #4a5568 5px,
+            #2d3748 5px,
+            #2d3748 10px) !important;
+    background-color: #2d3748 !important;
+    color: transparent !important;
     border-radius: 4px;
     cursor: pointer;
-    padding: 0 4px;
-    border: 1px dashed #718096;
+    padding: 2px 6px;
+    border: 1px dashed #a0aec0 !important;
     transition: all 0.2s;
+    user-select: none;
 }
 
 .ql-editor .tg-spoiler:hover,
 .ql-editor .tg-spoiler.revealed {
-    background: rgba(74, 85, 104, 0.3);
-    color: #fff;
-    border: 1px solid #4a5568;
-    text-shadow: none;
+    /* Class or hover to reveal */
+    background-image: none !important;
+    background-color: rgba(74, 85, 104, 0.5) !important;
+    color: #fff !important;
+    border: 1px solid #4a5568 !important;
+    text-shadow: none !important;
 }
 
 /* Custom Toolbar Button Size */
