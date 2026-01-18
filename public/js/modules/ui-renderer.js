@@ -286,6 +286,20 @@ export function renderTimelineView(forceClear = false) {
 
 function appendMessage(msg, container, lastDate, setLastDate) {
     const mid = msg.message_id?.toString();
+
+    // 🌿 Helper to determine type logic (duplicated from below, could be refactored)
+    const isBot = msg.from?.is_bot || msg.from?.id === 'bot' || (typeof msg.user === 'string' && msg.user.includes('Bot'));
+    const type = isBot ? 'bot' : 'client';
+
+    // Check if element exists in DOM to update it
+    const existingEl = document.getElementById(`msg-${mid}`);
+    if (existingEl) {
+        // Create new bubble and replace old one to show updates (reactions etc)
+        const newBubble = createMessageBubble(msg, type);
+        existingEl.replaceWith(newBubble);
+        return;
+    }
+
     if (renderedMessageIds.has(mid)) return;
 
     const msgDate = safeParseDate(msg.time).toLocaleDateString('uk-UA');
@@ -297,8 +311,8 @@ function appendMessage(msg, container, lastDate, setLastDate) {
         setLastDate(msgDate);
     }
 
-    const isBot = msg.from?.is_bot || msg.from?.id === 'bot' || (typeof msg.user === 'string' && msg.user.includes('Bot'));
-    const type = isBot ? 'bot' : 'client';
+    // const isBot = ... (Moved to top)
+    // const type = ... (Moved to top)
 
     const bubble = createMessageBubble(msg, type);
     container.appendChild(bubble);
@@ -319,6 +333,7 @@ function appendMessage(msg, container, lastDate, setLastDate) {
 function createMessageBubble(msg, type) {
     // console.log('DEBUG: Rendering message:', msg); 
     const div = document.createElement('div');
+    if (msg.message_id) div.id = `msg-${msg.message_id}`; // 🌿 Add ID for updates
 
     // 🎨 Sticker-only Logic 🌿
     const stickerSrc = msg.url_sticker || msg.url_animated_sticker || msg.sticker?.url || (typeof msg.sticker === 'string' ? msg.sticker : null);
