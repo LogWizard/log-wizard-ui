@@ -547,24 +547,35 @@ function createMessageBubble(msg, type) {
             </div>
         `;
 
-        // Async load avatar
+        // Async load avatar with spam protection 🌿
         if (userId) {
+            const currentUserId = userId; // Closure capture
             setTimeout(async () => {
                 try {
-                    // Try to use cached URL from List if available
-                    // Otherwise fetch
-                    const res = await fetch(`/api/get-user-photo?user_id=${userId}`);
+                    // Check if already failed previously to avoid re-fetching
+                    if (window.failedAvatars && window.failedAvatars.has(currentUserId)) return;
+
+                    const res = await fetch(`/api/get-user-photo?user_id=${currentUserId}`);
+
                     if (res.ok) {
                         const data = await res.json();
                         if (data.url) {
-                            const avatarEl = div.querySelector(`.message-avatar[data-user-id="${userId}"]`);
+                            const avatarEl = div.querySelector(`.message-avatar[data-user-id="${currentUserId}"]`);
                             if (avatarEl) {
                                 avatarEl.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
                             }
                         }
+                    } else {
+                        // Silent fail, collect stats
+                        if (!window.failedAvatars) window.failedAvatars = new Set();
+                        window.failedAvatars.add(currentUserId);
+                        reportAvatarErrors();
                     }
                 } catch (e) {
-                    console.warn('Avatar load failed', e);
+                    // Network error or other - collect too
+                    if (!window.failedAvatars) window.failedAvatars = new Set();
+                    window.failedAvatars.add(currentUserId);
+                    reportAvatarErrors();
                 }
             }, 0);
         }
@@ -587,6 +598,20 @@ function createMessageBubble(msg, type) {
         </div>
     `;
     return div;
+}
+
+// 🌿 Debounced Error Reporter
+let reportTimeout;
+function reportAvatarErrors() {
+    clearTimeout(reportTimeout);
+    reportTimeout = setTimeout(() => {
+        if (window.failedAvatars && window.failedAvatars.size > 0) {
+            console.groupCollapsed(`⚠️ Avatar Load Report: ${window.failedAvatars.size} failed`);
+            console.log('User IDs with no public photo/failed loading:', Array.from(window.failedAvatars));
+            console.log('These errors are suppressed to keep console clean.');
+            console.groupEnd();
+        }
+    }, 2000); // Report after 2 seconds of silence
 }
 
 function injectPlugins() {

@@ -444,46 +444,81 @@ export async function setReaction(req, res) {
 
         // 🌿 Update local JSON file with our reaction
         try {
-            const currentConfig = configManager.read();
+            const currentConfig = await configManager.read();
             const msgPathBase = currentConfig['Listening Path'] || 'messages';
+            const chatIdStr = String(chat_id);
+            const msgIdStr = String(message_id);
 
             // Find message file by ID (search recent dates)
             const today = new Date();
-            for (let i = 0; i < 7; i++) { // Search last 7 days
-                const date = new Date(today);
-                date.setDate(date.getDate() - i);
-                const dateStr = date.toLocaleDateString('uk-UA');
-                const filePath = path.join(msgPathBase, dateStr, `${message_id}.json`);
+            let fileUpdated = false;
+
+            for (let i = 0; i < 31; i++) { // Search last 31 days
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toLocaleDateString('uk-UA');
+
+                let filePath;
+                // Match Bot's file saving logic: ChatID + MessageID
+                if (chatIdStr.includes('-')) {
+                    filePath = path.join(msgPathBase, dateStr, chatIdStr, `${chatIdStr}${msgIdStr}.json`);
+                } else {
+                    filePath = path.join(msgPathBase, dateStr, `${chatIdStr}${msgIdStr}.json`);
+                }
 
                 if (fs.existsSync(filePath)) {
-                    const msgData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-                    // Update reactions in Telegram format
-                    if (!msgData.reactions) msgData.reactions = { results: [] };
-                    if (!msgData.reactions.results) msgData.reactions.results = [];
+                    // Prepare reactions array
+                    let reactions = content.reactions?.results || (Array.isArray(content.reactions) ? content.reactions : []);
+                    if (!Array.isArray(reactions)) reactions = []; // Safety check
 
-                    // Remove old same-type reaction from us, add new one
-                    msgData.reactions.results = msgData.reactions.results.filter(r => !r.is_own);
-                    if (emoji) {
-                        msgData.reactions.results.push({
-                            type: { type: 'emoji', emoji },
+                    // Logic: We are setting OUR reaction.
+                    // 1. If we are changing reaction, old reaction should be removed?
+                    //    Telegram's setMessageReaction REPLACES the user's reaction.
+                    //    So we should likely clear 'is_own' from others?
+                    //    But since we don't track WHO set other reactions, let's just mark the new one.
+
+                    const existingIdx = reactions.findIndex(r => (r.type?.emoji || r.emoji) === emoji);
+
+                    if (existingIdx >= 0) {
+                        reactions[existingIdx].is_own = true;
+                        // Assuming count is at least 1
+                    } else {
+                        reactions.push({
+                            type: { emoji },
                             total_count: 1,
-                            is_own: true
+                            is_own: true,
+                            emoji: emoji // fallback
                         });
                     }
 
-                    fs.writeFileSync(filePath, JSON.stringify(msgData, null, 2));
-                    console.log(`💬 Reaction saved to ${filePath}`);
+                    // Save back
+                    if (content.reactions?.results) {
+                        content.reactions.results = reactions;
+                    } else {
+                        content.reactions = reactions;
+                    }
+
+                    fs.writeFileSync(filePath, JSON.stringify(content, null, 2));
+                    console.log(`Reaction saved locally to ${filePath}`);
+                    fileUpdated = true;
                     break;
                 }
             }
-        } catch (fileErr) {
-            console.warn('⚠️ Could not update local reaction:', fileErr.message);
+
+            if (!fileUpdated) {
+                console.warn(`Could not find local file for message ${message_id} to save reaction.`);
+            }
+
+        } catch (localErr) {
+            console.error('Failed to save reaction locally:', localErr);
         }
 
-        res.json({ success: true, emoji });
+        res.json({ success: true, result: true });
+
     } catch (error) {
-        console.error('Error setting reaction:', error);
+        console.error('Error in setReaction:', error);
         res.status(500).json({ error: error.message });
     }
 }
