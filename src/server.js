@@ -474,19 +474,50 @@ export function createMessageServer() {
         }
     }
     async function urlReplaser(obj) {
-        const regex = /"url_.+?"/;
+        const paramsOnConfig = await configManager.read();
+        const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
+
+        // Check if we have existing url_* field to refresh
+        const regex = /\"url_.+?\"/;
         const match = JSON.stringify(obj).match(regex);
+
         if (match) {
+            // Existing url field - refresh it
             const file_id = await findFileId(obj);
-            const urlKey = match[0].replaceAll('"', '');
-            const url = obj[urlKey];
-            const botToken = await getBotTokenFromLink(url);
-            const newUrl = await getFileUrl(botToken, file_id);
-            const newObj = JSON.parse(JSON.stringify(obj).replace(JSON.stringify(obj[urlKey]), `"${newUrl}"`));
-            return newObj;
-        } else {
+            if (file_id && token) {
+                try {
+                    const newUrl = await getFileUrl(token, file_id);
+                    const urlKey = match[0].replaceAll('"', '');
+                    obj[urlKey] = newUrl;
+                } catch (e) {
+                    console.warn('Failed to refresh URL:', e.message);
+                }
+            }
             return obj;
         }
+
+        // No url_* field - try to create one from file_id 🌿
+        if (token) {
+            const file_id = await findFileId(obj);
+            if (file_id) {
+                try {
+                    const newUrl = await getFileUrl(token, file_id);
+                    // Determine which url field to set based on message type
+                    if (obj.sticker) obj.url_sticker = newUrl;
+                    else if (obj.photo) obj.url_photo = newUrl;
+                    else if (obj.video) obj.url_video = newUrl;
+                    else if (obj.video_note) obj.url_video_note = newUrl;
+                    else if (obj.voice) obj.url_voice = newUrl;
+                    else if (obj.audio) obj.url_audio = newUrl;
+                    else if (obj.animation) obj.url_animation = newUrl;
+                    else if (obj.document) obj.url_document = newUrl;
+                } catch (e) {
+                    console.warn('Failed to create URL from file_id:', e.message);
+                }
+            }
+        }
+
+        return obj;
     }
     async function getFileUrl(token, fileId) {
         const response = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
