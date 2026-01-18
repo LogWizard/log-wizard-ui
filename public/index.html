@@ -19,15 +19,13 @@
     <!-- Quill WYSIWYG Editor 🌿 -->
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 
-    <script src="/js/jquery-3.5.1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
-    <script src="/js/select2.min.js"></script>
-    <script src="/js/emojione.min.js"></script>
-    <script src="/js/tgs-player.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <!-- Quill WYSIWYG Editor 🌿 -->
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script src="/js/emojione.min.js"></script>
+    <script src="/js/prism.js"></script>
+
+    <!-- Custom Modules removed from head (loaded in body) 🌿 -->
 
     <title>Gys Bot Debug 🦆</title>
 
@@ -262,11 +260,12 @@
     <input style="display: none;" type="date" name="selectDateWidget" id="selectDateWidget"
         class="text ui-widget-content ui-corner-all">
 
-    <script src="/js/message-sender.js?v=2"></script>
-    <script type="module" src="/js/main.js?v=2"></script>
+    <!-- Core Scripts (Global & Modules) with Cache Busting v7 🌿 -->
+    <script src="/js/message-sender.js?v=7"></script>
     <script src="/js/audio-player.js"></script>
-    <script src="/js/prism.js"></script>
-    <script src="/js/quill-init.js?v=2"></script>
+    <!-- Prism already in head -->
+    <script src="/js/quill-init.js?v=7"></script>
+    <script type="module" src="/js/main.js?v=7"></script>
 </body>
 
 </html>
