@@ -508,10 +508,14 @@ function createMessageBubble(msg, type) {
 
     // 💬 Reactions HTML 🌿
     let reactionsHtml = '';
-    if (msg.reactions && Array.isArray(msg.reactions)) {
-        const reactionItems = msg.reactions.map(r => {
-            const emoji = r.emoji || (r.type === 'emoji' ? r.emoji : '❤️');
-            const count = r.count || 1;
+    // Telegram format: msg.reactions = { results: [{ type: { emoji: "👍" }, total_count: 1 }] }
+    // Or simple array: [{ emoji: "👍", count: 1 }]
+    const reactionsList = msg.reactions?.results || (Array.isArray(msg.reactions) ? msg.reactions : []);
+    if (reactionsList.length > 0) {
+        const reactionItems = reactionsList.map(r => {
+            // Handle Telegram format: r.type.emoji OR simple r.emoji
+            const emoji = r.type?.emoji || r.emoji || '❤️';
+            const count = r.total_count || r.count || 1;
             return `<span class="reaction-chip" style="display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; background: rgba(100, 181, 246, 0.15); border-radius: 12px; font-size: 13px; margin-right: 4px;">${emoji}${count > 1 ? `<span style="font-size: 11px; color: #8b98a7;">${count}</span>` : ''}</span>`;
         }).join('');
         reactionsHtml = `<div class="message-reactions" style="margin-top: 4px;">${reactionItems}</div>`;
