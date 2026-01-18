@@ -78,11 +78,13 @@ function initQuillEditor() {
         // 🌿 EXPORT GLOBALLY NOW (Crucial Fix)
         window.quill = quill;
 
-        // Add spoiler button handler
+        // --- Custom Button Handlers ---
+
+        // 1. Spoiler Button 👁️
         const spoilerBtn = document.querySelector('.ql-spoiler');
         if (spoilerBtn) {
             spoilerBtn.addEventListener('click', (e) => {
-                e.preventDefault(); // Prevent focus loss
+                e.preventDefault();
                 const range = quill.getSelection();
                 if (range) {
                     const format = quill.getFormat(range);
@@ -91,7 +93,39 @@ function initQuillEditor() {
             });
         }
 
-        console.log('🌿 Quill editor initialized & Global exported');
+        // 2. Highlight Button 🖍️
+        const highlightBtn = document.querySelector('.ql-highlight');
+        if (highlightBtn) {
+            highlightBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const range = quill.getSelection();
+                if (range) {
+                    const format = quill.getFormat(range);
+                    quill.format('highlight', !format.highlight);
+                }
+            });
+        }
+
+        // 3. Link Button 🔗 (Custom Handler)
+        const linkBtn = document.querySelector('.ql-link');
+        if (linkBtn) {
+            linkBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const range = quill.getSelection();
+                if (range) { // range length can be 0 (cursor) or >0
+                    // Check if already a link
+                    const currentFormat = quill.getFormat(range);
+                    const defaultValue = currentFormat.link || '';
+
+                    const value = prompt('Введіть посилання (URL):', defaultValue);
+                    if (value !== null) { // If not Cancel
+                        quill.format('link', value);
+                    }
+                }
+            });
+        }
+
+        console.log('🌿 Quill editor initialized & Handlers attached');
     } catch (e) {
         console.error('Quill init error:', e);
         createFallbackInput();
