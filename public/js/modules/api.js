@@ -172,11 +172,19 @@ export function distributeMessagesToGroups() {
 
     // Pass 1: Categorize
     state.allMessages.forEach(msg => {
-        const userId = msg.from?.id || msg.chat?.id || msg.user_id || 'unknown';
+        // 🌿 FIX: Для повідомлень бота використовуємо chat.id замість from.id
+        // Щоб відповіді бота йшли в чат користувача, а не в окрему групу
+        const isBot = msg.from?.is_bot === true;
+        const userId = isBot
+            ? (msg.chat?.id || msg.from?.id || 'unknown')  // Bot messages go to chat
+            : (msg.from?.id || msg.chat?.id || msg.user_id || 'unknown');  // User messages
+
         if (!groups[userId]) {
             groups[userId] = {
                 id: userId,
-                name: (msg.from?.first_name ? `${msg.from.first_name} ${msg.from.last_name || ''}` : msg.user || userId).trim(),
+                name: isBot
+                    ? (state.chatGroups[msg.chat?.id]?.name || msg.chat?.first_name || 'Chat')
+                    : (msg.from?.first_name ? `${msg.from.first_name} ${msg.from.last_name || ''}` : msg.user || userId).trim(),
                 messages: [],
                 lastMessage: msg,
                 avatar: null
