@@ -21,7 +21,16 @@
 /* Mobile Responsiveness 📱🌿 */
 @media (max-width: 768px) {
 
-    /* ===== RESET - прибираємо все зайве ===== */
+    /* ===== AGGRESSIVE RESET - прибираємо ВСЕ зайве ===== */
+    html,
+    body {
+        width: 100% !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow-x: hidden !important;
+    }
+
     * {
         box-sizing: border-box;
     }
@@ -30,8 +39,10 @@
     .telegram-container {
         position: relative;
         overflow: hidden;
-        width: 100vw;
-        max-width: 100vw;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     /* Chat List Panel - full width, absolute */
@@ -249,9 +260,21 @@
 
     /* ===== INPUT AREA - edge-to-edge ===== */
 
-    /* Hide formatting toolbar on mobile - занадто cluttered */
+    /* Formatting toolbar on mobile - компактний стиль */
     .formatting-toolbar {
-        display: none !important;
+        display: flex !important;
+        padding: 4px 8px;
+        gap: 6px;
+        justify-content: center;
+        background-color: #17212b;
+        border-top: 1px solid rgba(43, 82, 120, 0.5);
+        flex-shrink: 0;
+    }
+
+    .formatting-toolbar button {
+        padding: 6px 8px;
+        font-size: 12px;
+        min-width: 28px;
     }
 
     .message-input-wrapper {
