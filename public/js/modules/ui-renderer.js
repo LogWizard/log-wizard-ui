@@ -674,9 +674,13 @@ function createMessageBubble(msg, type) {
     // Force alignment style for bot messages to override any CSS conflicts 🌿
     const alignmentStyle = type === 'bot' ? 'justify-content: flex-end;' : 'justify-content: flex-start;';
 
-    // DEBUG: Check reactions on stickers
+    // DEBUG: Check reactions on stickers (Deep Dive)
     if (isStickerOnly) {
-        console.log(`🖼️ Sticker Msg ${msg.message_id} reactions:`, msg.reactions);
+        console.groupCollapsed(`🖼️ Sticker Msg ${msg.message_id} Debug`);
+        console.log('Full Message Object:', msg);
+        console.log('Reactions field:', msg.reactions);
+        console.log('Raw Data field:', msg.raw_data);
+        console.groupEnd();
     }
 
     div.className = `message-bubble ${type} ${isStickerOnly ? 'sticker-only' : ''}`;
