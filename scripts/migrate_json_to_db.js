@@ -86,10 +86,12 @@ async function migrate() {
                     }
 
                     // Insert IGNORE to skip existing
+                    const uniqueId = `${msg.chat.id}_${msg.message_id}`;
                     const [res] = await pool.query(`
-                        INSERT IGNORE INTO messages (message_id, chat_id, from_id, date, text, caption, type, media_url, raw_data)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT IGNORE INTO messages (unique_id, message_id, chat_id, from_id, date, text, caption, type, media_url, raw_data)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `, [
+                        uniqueId,
                         msg.message_id,
                         msg.chat.id,
                         msg.from?.id || 0,

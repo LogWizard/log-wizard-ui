@@ -104,9 +104,9 @@ window.seekVoice = function (event, voiceId) {
 
 // 🌿 Telegram/Markdown text formatter
 function formatMessageText(text) {
-    if (!text) return '';
+    if (!text && text !== 0) return ''; // Allow 0 to be printed if needed, else strict check
 
-    let result = text;
+    let result = String(text);
 
     // Escape HTML first (security)
     result = result.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
