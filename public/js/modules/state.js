@@ -51,15 +51,16 @@ export function setState(key, value) {
 }
 
 export function saveState() {
-    try {
-        const dataToSave = {
-            chatGroups: state.chatGroups,
-            allMessages: state.allMessages,
-            selectedChatId: state.selectedChatId,
-            latestMessageId: state.latestMessageId
-        };
-        localStorage.setItem('gys_chat_state', JSON.stringify(dataToSave));
-    } catch (e) { console.error('Cache save failed', e); }
+    // 🌿 Cache disabled by user request to prevent stale data issues
+    // try {
+    //     const dataToSave = {
+    //         chatGroups: state.chatGroups,
+    //         allMessages: state.allMessages,
+    //         selectedChatId: state.selectedChatId,
+    //         latestMessageId: state.latestMessageId
+    //     };
+    //     localStorage.setItem('gys_chat_state', JSON.stringify(dataToSave));
+    // } catch (e) { console.error('Cache save failed', e); }
 }
 
 export function loadState() {
