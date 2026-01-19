@@ -577,15 +577,18 @@ async function logToDB(msg) {
             mediaUrl = msg.url_animation || msg.animation.file_id;
         }
 
+        const uniqueId = `${msg.chat.id}_${msg.message_id}`;
+
         await pool.query(`
-            INSERT INTO messages (message_id, chat_id, from_id, date, text, caption, type, media_url, raw_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (unique_id, message_id, chat_id, from_id, date, text, caption, type, media_url, raw_data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
                 text = VALUES(text),
                 caption = VALUES(caption),
                 media_url = VALUES(media_url),
                 raw_data = VALUES(raw_data)
         `, [
+            uniqueId,
             msg.message_id,
             msg.chat.id,
             msg.from.id,
