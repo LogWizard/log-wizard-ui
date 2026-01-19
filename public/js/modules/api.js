@@ -198,25 +198,36 @@ export function distributeMessagesToGroups() {
 
     // Pass 1: Categorize
     state.allMessages.forEach(msg => {
-        // 🌿 FIX: Для повідомлень бота використовуємо chat.id замість from.id
-        // Щоб відповіді бота йшли в чат користувача, а не в окрему групу
-        const isBot = msg.from?.is_bot === true;
-        const userId = isBot
-            ? (msg.chat?.id || msg.from?.id || 'unknown')  // Bot messages go to chat
-            : (msg.from?.id || msg.chat?.id || msg.user_id || 'unknown');  // User messages
+        // 🌿 FIX: Consistent Grouping Logic
+        // We want to group by "Conversation ID" (Chat ID). 
+        // 1. Try DB field `chat_id` (most reliable)
+        // 2. Try nested `chat.id` (Telegram object)
+        // 3. Fallback to `user_id` / `from.id` only if private and chat_id missing
 
-        if (!groups[userId]) {
-            groups[userId] = {
-                id: userId,
-                name: isBot
-                    ? (state.chatGroups[msg.chat?.id]?.name || msg.chat?.first_name || 'Chat')
-                    : (msg.from?.first_name ? `${msg.from.first_name} ${msg.from.last_name || ''}` : msg.user || userId).trim(),
+        let conversationId = msg.chat_id || msg.chat?.id;
+
+        if (!conversationId) {
+            // Fallbacks for edge cases
+            if (msg.isBot || msg.from?.is_bot) {
+                conversationId = msg.chat_id || msg.chat?.id || msg.from?.id; // Bot msg -> Chat
+            } else {
+                conversationId = msg.from?.id || msg.user_id; // User msg -> User is the chat
+            }
+        }
+
+        // Ensure string for consistent keys
+        const groupId = String(conversationId || 'unknown');
+
+        if (!groups[groupId]) {
+            groups[groupId] = {
+                id: groupId,
+                name: (msg.chat?.title || msg.chat?.first_name || (msg.from?.first_name ? `${msg.from.first_name} ${msg.from.last_name || ''}` : msg.user) || 'Chat').trim(),
                 messages: [],
                 lastMessage: msg,
                 avatar: null
             };
         }
-        groups[userId].messages.push(msg);
+        groups[groupId].messages.push(msg);
     });
 
     // Pass 2: Sort each group once
