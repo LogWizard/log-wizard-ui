@@ -375,13 +375,19 @@ export async function createMessageServer() {
                 let photoUrl = 'none';
                 const chatIdStr = String(chat.id);
                 if (!chatIdStr.startsWith('-')) {
-                    // Private chat - fetch user photo
-                    const [userRows] = await pool.query(`
-                        SELECT photo_url FROM users WHERE id = ? LIMIT 1
-                    `, [chat.id]);
+                    // Private chat - check if we have cached avatar first
+                    const avatarPath = path.join(appDirectory, 'public', 'avatars', `${chat.id}.jpg`);
+                    if (fs.existsSync(avatarPath)) {
+                        photoUrl = `/avatars/${chat.id}.jpg`; // 🌿 Direct cached path
+                    } else {
+                        // Check DB to see if we should try fetching
+                        const [userRows] = await pool.query(`
+                            SELECT photo_url FROM users WHERE id = ? LIMIT 1
+                        `, [chat.id]);
 
-                    if (userRows && userRows.length > 0 && userRows[0].photo_url && userRows[0].photo_url !== 'none') {
-                        photoUrl = `/api/avatar-image/${chat.id}`; // 🌿 Use our proxy
+                        if (userRows && userRows.length > 0 && userRows[0].photo_url && userRows[0].photo_url !== 'none') {
+                            photoUrl = `/api/avatar-image/${chat.id}`; // 🌿 Will trigger caching on first load
+                        }
                     }
                 }
 
@@ -632,6 +638,9 @@ export async function createMessageServer() {
             res.status(404).send();
         }
     });
+
+    // 🌿 Static Files (Avatars) - Serve cached avatars
+    app.use('/avatars', express.static(path.join(appDirectory, 'public', 'avatars')));
 
     // 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
     app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
