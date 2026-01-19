@@ -149,6 +149,7 @@ export async function createMessageServer() {
         try {
             const urlObj = new URL(req.url, `http://${req.headers.host}`);
             const sinceParam = Number.parseInt(urlObj.searchParams.get('since')) || 0;
+            const limitParam = Number.parseInt(urlObj.searchParams.get('limit')); // 🌿 Limit support
             const dateStr = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
             // 🌿 Archive Flag
@@ -196,30 +197,14 @@ export async function createMessageServer() {
                 params.push(sinceParam);
             }
 
-            // 🌿 Archive Union Logic
-            if (includeArchive) {
-                // Duplicate query logic for archive table 
-                // (Note: This is a bit verbose but SQL injection safe)
-                let archiveQuery = `SELECT * FROM messages_archive WHERE 1=1`;
-
-                if (group && group !== 'allPrivate') {
-                    archiveQuery += ` AND chat_id = ?`; // param is pushed later or reused? 
-                    // To reuse params array for UNION, we need to duplicate the values in it
-                    // Or use named parameters, but mysql2 uses ?
-                    // Let's just create a full string union safely since we have inputs.
-                }
-
-                // Re-building params is tricky with ? style. 
-                // Let's just execute two queries and merge in JS for simplicity, or building complex SQL.
-                // Merging in JS is safer/easier for this context.
-
-                // ... Actually, let's stick to the main query for now, and if archive is on, we do a second query.
+            // 4. Sort & Limit 🌿
+            if (limitParam) {
+                // Fetch LATEST messages (Newest first)
+                query += ` ORDER BY date DESC, message_id DESC LIMIT ${limitParam}`;
             } else {
-                // Query is fine as is for 'messages'
+                // Legacy: Fetch OLDEST messages (Chronological) - usually for full date range
+                query += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
             }
-
-            // 4. Sort & Limit
-            query += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
 
             let [rows] = await pool.query(query, params);
 
@@ -249,12 +234,27 @@ export async function createMessageServer() {
                     archiveParams.push(sinceParam);
                 }
 
-                archiveQuery += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
+                if (limitParam) {
+                    archiveQuery += ` ORDER BY date DESC, message_id DESC LIMIT ${limitParam}`;
+                } else {
+                    archiveQuery += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
+                }
 
                 const [archiveRows] = await pool.query(archiveQuery, archiveParams);
-                rows = [...archiveRows, ...rows]; // Archive first, then new messages
+                rows = [...archiveRows, ...rows]; // Combine
+            }
 
-                // Re-sort combined
+            // 5. Final Sort 🌿
+            if (limitParam) {
+                // We fetched DESC (Newest First).
+                // Sort combined results DESC to ensure correct top N
+                rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+                // Slice to limit (in case archive + main > limit)
+                if (rows.length > limitParam) rows = rows.slice(0, limitParam);
+                // Reverse to ASC (Chronological) for frontend
+                rows.reverse();
+            } else {
+                // Legacy ASC sort (Oldest First)
                 rows.sort((a, b) => new Date(a.date) - new Date(b.date));
             }
 
