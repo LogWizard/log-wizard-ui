@@ -1157,15 +1157,26 @@ window.handleReaction = async function (chatId, msgId, emoji) {
         if (existing) {
             existing.is_own = false;
             if (existing.total_count > 0) existing.total_count--;
-            // If count 0, remove from list?
+            // If count 0, remove from list
             if (existing.total_count <= 0) {
                 reactions = reactions.filter(r => r !== existing);
             }
         }
     } else {
+        // 🌿 Enforce Single Reaction for Bot (Clear others)
+        reactions.forEach(r => {
+            const rEmoji = r.type?.emoji || r.emoji;
+            if (rEmoji !== emoji && r.is_own) {
+                r.is_own = false;
+                if (r.total_count > 0) r.total_count--;
+            }
+        });
+
         if (existing) {
-            existing.is_own = true;
-            existing.total_count++;
+            if (!existing.is_own) {
+                existing.is_own = true;
+                existing.total_count++;
+            }
         } else {
             reactions.push({ type: { emoji }, emoji, total_count: 1, is_own: true });
         }
@@ -1175,8 +1186,10 @@ window.handleReaction = async function (chatId, msgId, emoji) {
     if (msg.reactions?.results) msg.reactions.results = reactions;
     else msg.reactions = reactions;
 
-    // 4. Re-Render Chat (Fast Update)
+    // 4. Force UI Refresh (Important for removal sync!) 🌿
     if (state.currentView === 'chat' && state.selectedChatId == chatId) {
+        // Clear cached ID to force re-render of this message
+        renderedMessageIds.delete(String(msgId));
         renderChatMessages(chatId, false);
     } else if (state.currentView === 'timeline') {
         // Find element and update manually? Too hard.
