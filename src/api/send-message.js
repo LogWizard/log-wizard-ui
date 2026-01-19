@@ -495,12 +495,26 @@ export async function setReaction(req, res) {
                             reactions[existingIdx].is_own = false;
                             if (reactions[existingIdx].total_count > 0) reactions[existingIdx].total_count--;
                         } else {
+                            // 🌿 Enforce Single Reaction: Unset others
+                            reactions.forEach((r, idx) => {
+                                if (idx !== existingIdx && r.is_own) {
+                                    r.is_own = false;
+                                    if (r.total_count > 0) r.total_count--;
+                                }
+                            });
+
                             reactions[existingIdx].is_own = true;
-                            // We don't increment here implicitly because count usually reflects total from TG.
-                            // But for consistency:
                             // reactions[existingIdx].total_count++;
                         }
                     } else if (!shouldRemove) {
+                        // 🌿 Enforce Single Reaction: Unset others
+                        reactions.forEach(r => {
+                            if (r.is_own) {
+                                r.is_own = false;
+                                if (r.total_count > 0) r.total_count--;
+                            }
+                        });
+
                         reactions.push({
                             type: { emoji },
                             total_count: 1,
