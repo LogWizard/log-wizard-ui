@@ -1899,3 +1899,27 @@ body {
 .message-bubble.client .reaction-chip {
   pointer-events: auto !important;
 }
+
+/* 🌿 Sticker/GIF Pure Media Styles - Time Hover Only & Position */
+.message-bubble.sticker-only .message-meta {
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+  bottom: 4px;
+  /* Lower corner */
+  right: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+/* Show on hover */
+.message-bubble.sticker-only:hover .message-meta {
+  opacity: 1;
+}
+
+/* Ensure reactions don't overlap time (though time is hidden by default) */
+.message-bubble.sticker-only .message-reactions {
+  margin-bottom: 8px;
+  /* Space above hidden time area */
+}
