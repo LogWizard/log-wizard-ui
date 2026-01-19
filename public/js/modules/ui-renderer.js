@@ -258,7 +258,6 @@ function updateChatListItem(div, chat) {
     const initials = getInitials(chat.name);
 
     // 1. Check API photo first (e.g. updated from server poll)
-    console.log(`🖼️ Chat list avatar for ${chat.id}: photo=${chat.photo}`);
     if (chat.photo && chat.photo !== 'none') {
         const avatarContainer = div.querySelector('.chat-item-avatar');
         if (avatarContainer) {
@@ -919,6 +918,8 @@ function createMessageBubble(msg, type) {
     const rawReactions = msg.reactions || [];
     let reactionsList = Array.isArray(rawReactions) ? rawReactions : (rawReactions.results || []);
 
+    if (isStickerOnly) console.log(`Sticker Msg ${msgId} Debug: reactions=`, reactionsList); // DEBUG 🌿
+
     // Handle object format { "👍": 1 } or specific Bot API structures
     if (!Array.isArray(reactionsList) && typeof rawReactions === 'object' && Object.keys(rawReactions).length > 0) {
         reactionsList = Object.entries(rawReactions).map(([emoji, data]) => ({
@@ -928,14 +929,11 @@ function createMessageBubble(msg, type) {
         }));
     }
 
-    const msgId = msg.message_id;
-    const chatId = msg.chat?.id || msg.chat_id || window.selectedChatId;
-
     if (reactionsList && reactionsList.length > 0) {
         const reactionItems = reactionsList.map(r => {
             const emoji = r.type?.emoji || r.emoji || '❤️';
             const count = r.total_count || r.count || 1;
-            const isOwn = r.is_own || false;
+            const isOwn = r.is_own === true || r.is_own === 1 || false; // Robust check
 
             // 🌿 Unified Reaction Styles (Standard pills for all types)
             const chipStyle = 'padding: 4px 10px; border-radius: 16px; margin-right: 4px; backdrop-filter: blur(4px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); ' + (isOwn
@@ -1204,101 +1202,8 @@ window.handleReaction = async function (chatId, msgId, emoji) {
     }
 };
 
-// 💬 Reaction Picker Logic 🌿
-window.showReactionPicker = function (e, msgId, chatId) {
-    // Remove existing
-    document.querySelectorAll('.reaction-picker').forEach(p => p.remove());
 
-    const picker = document.createElement('div');
-    picker.className = 'reaction-picker';
-    picker.style.cssText = `
-        position: fixed;
-        background: linear-gradient(135deg, #1e2c3a 0%, #17212b 100%);
-        border: 1px solid #2b5278;
-        border-radius: 16px;
-        padding: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        max-width: 280px;
-        z-index: 10000;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-        animation: fadeIn 0.15s ease-out;
-    `;
 
-    // Position near mouse
-    const x = Math.min(e.clientX, window.innerWidth - 300);
-    const y = Math.min(e.clientY, window.innerHeight - 200);
-    picker.style.left = `${Math.max(10, x)}px`;
-    picker.style.top = `${Math.max(10, y)}px`;
-
-    // Extended emoji list (Telegram allowed + popular) 🌿
-    const emojis = [
-        '👍', '👎', '❤️', '🔥', '🥰', '👏', '😁', '🤔',
-        '🤯', '😱', '🤬', '😢', '🎉', '🤩', '🤮', '💩',
-        '🙏', '👌', '🕊️', '🤡', '🥱', '🥴', '😍', '🐳',
-        '❤️‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆',
-        '💔', '🖕', '😐', '🍓', '🍾', '💋', '😴', '👀'
-    ];
-
-    emojis.forEach(emoji => {
-        const btn = document.createElement('span');
-        btn.textContent = emoji;
-        btn.style.cssText = `cursor: pointer; font-size: 22px; padding: 6px; border-radius: 8px; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;`;
-
-        btn.onmouseenter = () => { btn.style.background = 'rgba(100,181,246,0.25)'; btn.style.transform = 'scale(1.2)'; };
-        btn.onmouseleave = () => { btn.style.background = 'transparent'; btn.style.transform = 'scale(1)'; };
-
-        btn.onclick = async () => {
-            btn.textContent = '⏳';
-            try {
-                // Call API directly or via helper
-                await fetch('/api/set-reaction', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, message_id: msgId, reaction: emoji })
-                });
-
-                // Optimistic UI Update within state
-                if (window.state && window.state.chatGroups) {
-                    const chat = window.state.chatGroups[chatId];
-                    if (chat && chat.messages) {
-                        const m = chat.messages.find(msg => msg.message_id?.toString() === msgId.toString());
-                        if (m) {
-                            if (!m.reactions || Array.isArray(m.reactions)) m.reactions = { results: [] };
-                            m.reactions.results = (m.reactions.results || []).filter(r => !r.is_own);
-                            m.reactions.results.push({ emoji: emoji, count: 1, total_count: 1, is_own: true });
-                        }
-                    }
-                }
-
-                // Re-render
-                if (typeof renderChatMessages === 'function') renderChatMessages(chatId, false);
-                picker.remove();
-                console.log(`Reacted ${emoji} to ${msgId}`);
-
-            } catch (e) {
-                console.error(e);
-                btn.textContent = '❌';
-                setTimeout(() => btn.textContent = emoji, 1000);
-            }
-        };
-        picker.appendChild(btn);
-    });
-
-    document.body.appendChild(picker);
-
-    // Close on outside click
-    setTimeout(() => {
-        const closeListener = (evt) => {
-            if (!picker.contains(evt.target)) {
-                picker.remove();
-                document.removeEventListener('click', closeListener);
-            }
-        };
-        document.addEventListener('click', closeListener);
-    }, 100);
-};
 
 // 🌿 Header Avatar Update
 function updateHeaderAvatar(chat) {

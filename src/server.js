@@ -394,7 +394,6 @@ export async function createMessageServer() {
                     }
                 }
 
-                console.log(`🖼️ Chat ${chat.id} photoUrl: ${photoUrl}`);
 
                 return {
                     id: chat.id.toString(), // Ensure string for JS
