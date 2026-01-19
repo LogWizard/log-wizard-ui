@@ -11,6 +11,8 @@ body {
   font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: #0e1621;
   overflow: hidden;
+  overscroll-behavior: none;
+  /* 🌿 Fix mobile scroll empty space */
 }
 
 /* Main Container */
@@ -607,9 +609,10 @@ body {
 /* 🌿 Telegram-style: reactions LEFT, time RIGHT */
 .bubble-content {
   min-width: 120px;
-  max-width: 440px;
-  padding: 8px 12px 35px 12px;
-  /* 🌿 35px bottom padding to prevent time overlap */
+  max-width: 520px;
+  /* 🌿 Increased from 440px for TG-style wider bubbles */
+  padding: 8px 12px 28px 12px;
+  /* 🌿 Reduced from 35px since wider bubble = more room for time */
   position: relative;
 }
 
@@ -623,8 +626,10 @@ body {
 /* 🌿 Mobile: Extra padding to prevent time overlap */
 @media (max-width: 768px) {
   .bubble-content {
-    padding-bottom: 42px !important;
-    /* Extra space for mobile */
+    max-width: 85%;
+    /* 🌿 Wider on mobile */
+    padding-bottom: 32px !important;
+    /* Less padding needed with wider bubble */
   }
 }
 
