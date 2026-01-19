@@ -538,11 +538,16 @@ export async function createMessageServer() {
             const { userId } = req.params;
             const pool = getPool();
 
+            console.log(`🖼️ Avatar request for user ${userId}`);
+
             // Get photo_url from database
             if (pool) {
                 const [rows] = await pool.query(`SELECT photo_url FROM users WHERE id = ? LIMIT 1`, [userId]);
+                console.log(`📊 DB result for user ${userId}:`, rows);
+
                 if (rows && rows.length > 0 && rows[0].photo_url && rows[0].photo_url !== 'none') {
                     const photoUrl = rows[0].photo_url;
+                    console.log(`✅ Found avatar URL: ${photoUrl}`);
 
                     // Proxy the Telegram image
                     const imageResp = await fetch(photoUrl);
@@ -554,6 +559,8 @@ export async function createMessageServer() {
 
                     const buffer = await imageResp.arrayBuffer();
                     return res.send(Buffer.from(buffer));
+                } else {
+                    console.log(`❌ No avatar in DB for user ${userId}`);
                 }
             }
 

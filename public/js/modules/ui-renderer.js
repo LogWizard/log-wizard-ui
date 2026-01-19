@@ -1111,12 +1111,17 @@ window.handleReaction = async function (chatId, msgId, emoji) {
     // UI Renderer usually doesn't do direct API calls unless imported.
     // Let's assume we use fetch directly or global.
     try {
-        await fetch('/api/set-reaction', {
+        const response = await fetch('/api/set-reaction', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, message_id: msgId, reaction: emoji })
+            body: JSON.stringify({ chat_id: chatId, message_id: msgId, emoji: emoji })
         });
-        console.log(`Reacted ${emoji} to ${msgId}`);
+        const data = await response.json();
+        if (data.success) {
+            console.log(`✅ Reacted ${emoji} to ${msgId}`);
+        } else {
+            console.error('Reaction failed:', data.error);
+        }
         // Optimistic update handled by socket/polling usually
     } catch (e) { console.error(e); }
 };
