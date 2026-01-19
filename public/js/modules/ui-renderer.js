@@ -918,6 +918,9 @@ function createMessageBubble(msg, type) {
     const rawReactions = msg.reactions || [];
     let reactionsList = Array.isArray(rawReactions) ? rawReactions : (rawReactions.results || []);
 
+    const msgId = msg.message_id;
+    const chatId = msg.chat?.id || msg.chat_id || window.selectedChatId;
+
     if (isStickerOnly) console.log(`Sticker Msg ${msgId} Debug: reactions=`, reactionsList); // DEBUG 🌿
 
     // Handle object format { "👍": 1 } or specific Bot API structures
