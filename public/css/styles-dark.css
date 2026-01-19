@@ -1901,16 +1901,25 @@ body {
 }
 
 /* 🌿 Sticker/GIF Pure Media Styles - Time Hover Only & Position */
+/* 🌿 Sticker/GIF Pure Media Styles - Time Hover Only & Position */
+.message-bubble.sticker-only .bubble-content {
+  padding: 0 !important;
+  /* Remove bubble padding so sticker is frame-to-frame */
+  background: transparent !important;
+  /* Ensure no bubble bg visible */
+  box-shadow: none !important;
+}
+
 .message-bubble.sticker-only .message-meta {
   opacity: 0;
   transition: opacity 0.25s ease-in-out;
-  bottom: 4px;
-  /* Lower corner */
-  right: 4px;
+  bottom: 2px;
+  /* Tight corner */
+  right: 2px;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
-  padding: 2px 6px;
-  border-radius: 8px;
+  padding: 1px 5px;
+  border-radius: 6px;
 }
 
 /* Show on hover */
@@ -1918,8 +1927,14 @@ body {
   opacity: 1;
 }
 
-/* Ensure reactions don't overlap time (though time is hidden by default) */
+/* Reactions adjustment for sticker mode */
 .message-bubble.sticker-only .message-reactions {
-  margin-bottom: 8px;
-  /* Space above hidden time area */
+  margin: 4px 0 2px 4px;
+  position: absolute;
+  /* Float reactions too? Or let them flow? */
+  /* If we float, they cover sticker. If flow, they expand container. */
+  /* Better to let them flow but ensure container allows it. */
+  /* If padding is 0, they flow below sticker. */
+  position: static;
+  padding: 4px;
 }
