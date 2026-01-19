@@ -347,16 +347,30 @@ export async function createMessageServer() {
                 }
 
                 // 🌿 Filter Logic: Hide chat if no messages and archive is OFF
-                // Only showing active chats prevents "History" clutter
+                // 3. Hide if no messages and archive not enabled
                 if (!lastMsg && !includeArchive) {
-                    return null;
+                    return null; // Filter this out
+                }
+
+                // 🌿 Fetch user photo_url for private chats
+                let photoUrl = 'none';
+                const chatIdStr = String(chat.id);
+                if (!chatIdStr.startsWith('-')) {
+                    // Private chat - fetch user photo
+                    const [userRows] = await pool.query(`
+                        SELECT photo_url FROM users WHERE id = ? LIMIT 1
+                    `, [chat.id]);
+
+                    if (userRows && userRows.length > 0 && userRows[0].photo_url) {
+                        photoUrl = userRows[0].photo_url;
+                    }
                 }
 
                 return {
                     id: chat.id.toString(), // Ensure string for JS
                     name: chat.title || chat.username || 'Unknown',
                     type: chat.type,
-                    photo: chat.photo_url,
+                    photo: photoUrl, // 🌿 Use fetched photo_url
                     lastMessage: lastMsg || { time: chat.last_updated, text: 'History' },
                     lastDate: lastMsg?.time || chat.last_updated
                 };
