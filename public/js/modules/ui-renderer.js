@@ -258,6 +258,7 @@ function updateChatListItem(div, chat) {
     const initials = getInitials(chat.name);
 
     // 1. Check API photo first (e.g. updated from server poll)
+    console.log(`🖼️ Chat list avatar for ${chat.id}: photo=${chat.photo}`);
     if (chat.photo && chat.photo !== 'none') {
         const avatarContainer = div.querySelector('.chat-item-avatar');
         if (avatarContainer) {
@@ -1246,6 +1247,7 @@ function updateHeaderAvatar(chat) {
     avatarEl.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ${color}; border-radius: 50%; color: white; font-weight: bold;">${letter}</div>`;
 
     // 🌿 Use Backend-Provided Info
+    console.log(`🖼️ Header avatar for chat ${chat.id}: photo=${chat.photo}`);
     if (chat.photo && chat.photo !== 'none') {
         avatarEl.innerHTML = `<img src="${chat.photo}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.remove(); this.parentElement ? this.parentElement.innerText = '${letter}' : null;">`;
     } else {
