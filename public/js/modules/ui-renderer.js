@@ -458,6 +458,11 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
     if (isNewChat || shouldMsgScrollBottom || wasAtBottom) {
         container.scrollTop = container.scrollHeight;
 
+        // 🌿 Backup Scroll: Ensure we hit bottom after layout stabilizes (short delay)
+        setTimeout(() => {
+            if (container) container.scrollTop = container.scrollHeight;
+        }, 150);
+
         // 🌿 Smart Image Scroll: Only scroll if user is STILL near bottom
         // This prevents "jumping" if user starts scrolling up while images load
         const images = container.querySelectorAll('img');
