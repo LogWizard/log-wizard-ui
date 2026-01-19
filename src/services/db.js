@@ -108,6 +108,25 @@ async function createTables() {
         // Ignore "Duplicate column name" error
     }
 
+    // 🌿 Migration: Avatar Caching Columns
+    try {
+        await pool.query(`ALTER TABLE users ADD COLUMN avatar_cached TINYINT(1) DEFAULT 0`);
+    } catch (e) { /* Column exists */ }
+
+    try {
+        await pool.query(`ALTER TABLE users ADD COLUMN last_avatar_check BIGINT DEFAULT 0`);
+    } catch (e) { /* Column exists */ }
+
+    try {
+        await pool.query(`CREATE INDEX idx_avatar_cached ON users(avatar_cached)`);
+    } catch (e) { /* Index exists */ }
+
+    try {
+        await pool.query(`CREATE INDEX idx_last_avatar_check ON users(last_avatar_check)`);
+    } catch (e) { /* Index exists */ }
+
+    console.log('✅ Avatar caching schema ready');
+
     // 3. Chats Table
     await pool.query(`
         CREATE TABLE IF NOT EXISTS chats (
