@@ -16,47 +16,43 @@ const dbConfig = {
     database: 'log_wizard'
 };
 
-const MSG_ID = 294138; // Target ID
+const MSG_ID = 294123; // Target ID
 
 async function debugData() {
     console.log(`🔎 hunting for message ${MSG_ID}...`);
 
-    // 1. Scan FS
-    console.log(`📂 Scanning ${MESSAGES_ROOT} for *${MSG_ID}.json...`);
-    // Find file
-    const files = getAllJsonFiles(MESSAGES_ROOT);
-    const targetFile = files.find(f => f.includes(`${MSG_ID}.json`));
-
-    if (targetFile) {
-        console.log(`✅ File found: ${targetFile}`);
-        const content = fs.readFileSync(targetFile, 'utf8');
-        const json = JSON.parse(content);
-        console.log(`📄 File Content Reactions:`, json.reactions);
-        console.log(`📄 File Content Keys:`, Object.keys(json));
-    } else {
-        console.error(`❌ File NOT found in FS!`);
-    }
+    // 1. File Check SKIPPED
 
     // 2. Check DB
     const pool = mysql.createPool(dbConfig);
     try {
-        const [rows] = await pool.query('SELECT raw_data FROM messages WHERE message_id = ?', [MSG_ID]);
-        if (rows.length > 0) {
-            console.log(`🗄️ DB Record Found.`);
-            if (rows[0].raw_data) {
-                const dbJson = typeof rows[0].raw_data === 'string' ? JSON.parse(rows[0].raw_data) : rows[0].raw_data;
-                console.log(`🗄️ DB Raw Data Reactions:`, dbJson.reactions);
-            } else {
-                console.log(`🗄️ DB Raw Data is NULL/Empty`);
-            }
+        const [rows] = await pool.query('SELECT * FROM messages WHERE message_id = ?', [MSG_ID]);
+        if (rows.length === 0) {
+            console.log('❌ Message NOT FOUND in DB');
         } else {
-            console.log(`🗄️ No DB Record found for ${MSG_ID}`);
+            const row = rows[0];
+            console.log('✅ Message FOUND in DB');
+            console.log(`   ID: ${row.id} | UniqueID: ${row.unique_id} | Date: ${row.date}`);
+            console.log(`   Raw Data Length: ${row.raw_data ? row.raw_data.length : 0}`);
+            console.log('   DB Raw Data:', row.raw_data ? row.raw_data.substring(0, 200) + '...' : 'NULL');
+
+            if (row.raw_data) {
+                try {
+                    const parsed = JSON.parse(row.raw_data);
+                    console.log('   DB Parsed Reactions:', JSON.stringify(parsed.reactions, null, 2));
+                } catch (e) {
+                    console.log('   ❌ Failed to parse raw_data');
+                }
+            } else {
+                console.log('   ❌ Raw Data is NULL/Empty');
+            }
         }
     } catch (e) {
         console.error(e);
     } finally {
         await pool.end();
     }
+    process.exit();
 }
 
 function getAllJsonFiles(dir, fileList = []) {

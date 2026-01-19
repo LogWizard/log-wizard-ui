@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { fetchMessages, fetchMessagesForDate, fetchSingleChatUpdate } from './api.js';
+import { fetchMessages, fetchMessagesForDate, fetchSingleChatUpdate, sendReaction } from './api.js';
 import { safeParseDate, isToday as checkIsToday, getColorForUser } from './utils.js';
 import { avatarManager } from './avatar-manager.js';
 
@@ -581,6 +581,7 @@ export function renderTimelineView(forceClear = false) {
 
 function appendMessage(msg, container, lastDate, setLastDate) {
     const mid = msg.message_id?.toString();
+    const msgDate = safeParseDate(msg.time).toLocaleDateString('uk-UA'); // 🌿 Move Up for Badge Logic
 
     // 🌿 Robust Bot Search
     const isBot = msg.isBot === true ||
@@ -599,12 +600,13 @@ function appendMessage(msg, container, lastDate, setLastDate) {
         const activeAudio = existingEl.querySelector('audio');
         const activeVideo = existingEl.querySelector('video');
 
-        if (activeAudio && !activeAudio.paused) return; // Audio playing - SKIP
-        if (activeVideo && !activeVideo.paused && !activeVideo.muted) return; // Video playing - SKIP
+        if (activeAudio && !activeAudio.paused) { setLastDate(msgDate); return; } // Audio playing - SKIP
+        if (activeVideo && !activeVideo.paused && !activeVideo.muted) { setLastDate(msgDate); return; } // Video playing - SKIP
 
         // 🌿 SMART HASH: Update only if content changed
         const contentHash = getMessageHash(msg);
         if (existingEl.dataset.hash === contentHash) {
+            setLastDate(msgDate); // 🌿 CRITICAL FIX: Update date even if skipped
             return; // No changes - SKIP
         }
 
@@ -612,6 +614,7 @@ function appendMessage(msg, container, lastDate, setLastDate) {
         const newBubble = createMessageBubble(msg, type);
         newBubble.dataset.hash = contentHash;
         existingEl.replaceWith(newBubble);
+        setLastDate(msgDate);
         return;
     }
 
@@ -622,7 +625,6 @@ function appendMessage(msg, container, lastDate, setLastDate) {
     // Calculate Hash
     const contentHash = getMessageHash(msg);
 
-    const msgDate = safeParseDate(msg.time).toLocaleDateString('uk-UA');
     if (msgDate !== lastDate) {
         // Check if separator already exists for this date to avoid duplicates
         // (Simplified check - usually appended sequentially)
@@ -937,7 +939,7 @@ function createMessageBubble(msg, type) {
                 ? 'background: rgba(59, 130, 246, 0.75); border: 1px solid rgba(100, 181, 246, 0.5); color: white;'
                 : 'background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); color: #e0e0e0;');
 
-            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}" style="${chipStyle}">${emoji}${count > 1 ? `<span class="reaction-count" style="margin-left:4px; font-size: 0.9em; opacity: 0.9;">${count}</span>` : ''}</span>`;
+            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}" style="${chipStyle} cursor: pointer;" onclick="event.stopPropagation(); window.handleReaction('${chatId}', '${msgId}', '${emoji}')">${emoji}${count > 1 ? `<span class="reaction-count" style="margin-left:4px; font-size: 0.9em; opacity: 0.9;">${count}</span>` : ''}</span>`;
         }).join('');
 
         // 🌿 Consistent container for all types
@@ -1131,25 +1133,61 @@ window.showReactionPicker = function (e, msgId, chatId) {
     setTimeout(() => document.addEventListener('click', closeListener), 10);
 };
 
-// Handle Reaction API Call
+// Handle Reaction API Call (Toggle Logic) 🌿
 window.handleReaction = async function (chatId, msgId, emoji) {
-    // ... existing logic needed? Or just import `setReaction` from api.js if available? 
-    // UI Renderer usually doesn't do direct API calls unless imported.
-    // Let's assume we use fetch directly or global.
-    try {
-        const response = await fetch('/api/set-reaction', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, message_id: msgId, emoji: emoji })
-        });
-        const data = await response.json();
-        if (data.success) {
-            console.log(`✅ Reacted ${emoji} to ${msgId}`);
-        } else {
-            console.error('Reaction failed:', data.error);
+    if (!chatId || !msgId) return;
+
+    // 1. Find Message in State
+    const msg = state.chatGroups[chatId]?.messages.find(m => String(m.message_id) === String(msgId))
+        || state.allMessages.find(m => String(m.message_id) === String(msgId));
+
+    if (!msg) return;
+
+    // 2. Determine Action
+    let reactions = msg.reactions?.results || (Array.isArray(msg.reactions) ? msg.reactions : []);
+    if (!Array.isArray(reactions)) reactions = [];
+
+    // Normalize logic
+    const existing = reactions.find(r => (r.type?.emoji || r.emoji) === emoji);
+    const action = (existing && existing.is_own) ? 'remove' : 'add';
+
+    // 3. Optimistic Update (Visual)
+    if (action === 'remove') {
+        if (existing) {
+            existing.is_own = false;
+            if (existing.total_count > 0) existing.total_count--;
+            // If count 0, remove from list?
+            if (existing.total_count <= 0) {
+                reactions = reactions.filter(r => r !== existing);
+            }
         }
-        // Optimistic update handled by socket/polling usually
-    } catch (e) { console.error(e); }
+    } else {
+        if (existing) {
+            existing.is_own = true;
+            existing.total_count++;
+        } else {
+            reactions.push({ type: { emoji }, emoji, total_count: 1, is_own: true });
+        }
+    }
+
+    // Save back to msg
+    if (msg.reactions?.results) msg.reactions.results = reactions;
+    else msg.reactions = reactions;
+
+    // 4. Re-Render Chat (Fast Update)
+    if (state.currentView === 'chat' && state.selectedChatId == chatId) {
+        renderChatMessages(chatId, false);
+    } else if (state.currentView === 'timeline') {
+        // Find element and update manually? Too hard.
+        // renderTimelineView(); // might be slow.
+    }
+
+    // 5. Send Request
+    try {
+        await sendReaction(chatId, msgId, emoji, action);
+    } catch (e) {
+        console.error('Reaction toggle failed:', e);
+    }
 };
 
 // 💬 Reaction Picker Logic 🌿

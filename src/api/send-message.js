@@ -427,15 +427,16 @@ export async function sendVoiceNote(req, res) {
  * Set reaction on a message
  */
 export async function setReaction(req, res) {
-    const { chat_id, message_id, emoji, is_big } = req.body;
+    const { chat_id, message_id, emoji, is_big, action } = req.body; // action: 'add' | 'remove' (default 'add')
 
     if (!chat_id || !message_id) {
         return res.status(400).json({ error: 'chat_id and message_id are required' });
     }
 
     try {
+        const shouldRemove = action === 'remove';
         // Build reaction array (single emoji for non-premium bots)
-        const reaction = emoji ? [{ type: 'emoji', emoji }] : [];
+        const reaction = (!shouldRemove && emoji) ? [{ type: 'emoji', emoji }] : [];
 
         const payload = {
             chat_id,
@@ -485,18 +486,19 @@ export async function setReaction(req, res) {
                     let reactions = content.reactions?.results || (Array.isArray(content.reactions) ? content.reactions : []);
                     if (!Array.isArray(reactions)) reactions = []; // Safety check
 
-                    // Logic: We are setting OUR reaction.
-                    // 1. If we are changing reaction, old reaction should be removed?
-                    //    Telegram's setMessageReaction REPLACES the user's reaction.
-                    //    So we should likely clear 'is_own' from others?
-                    //    But since we don't track WHO set other reactions, let's just mark the new one.
-
                     const existingIdx = reactions.findIndex(r => (r.type?.emoji || r.emoji) === emoji);
 
                     if (existingIdx >= 0) {
-                        reactions[existingIdx].is_own = true;
-                        // Assuming count is at least 1
-                    } else {
+                        if (shouldRemove) {
+                            reactions[existingIdx].is_own = false;
+                            if (reactions[existingIdx].total_count > 0) reactions[existingIdx].total_count--;
+                        } else {
+                            reactions[existingIdx].is_own = true;
+                            // We don't increment here implicitly because count usually reflects total from TG.
+                            // But for consistency:
+                            // reactions[existingIdx].total_count++;
+                        }
+                    } else if (!shouldRemove) {
                         reactions.push({
                             type: { emoji },
                             total_count: 1,
@@ -504,6 +506,8 @@ export async function setReaction(req, res) {
                             emoji: emoji // fallback
                         });
                     }
+
+                    // If remove and not found, nothing to do
 
                     // Save back
                     if (content.reactions?.results) {

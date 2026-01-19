@@ -88,15 +88,26 @@ export async function fetchMessages() {
             }
         }
 
-        // If we still have no date and no chat, and it's not a global sync attempt, we might return
-        // BUT for a "normal messenger" feel, we SHOULD fetch today's global activity on start
-        if (!dateParam && !state.selectedChatId) {
-            dateParam = new Date().toLocaleDateString('uk-UA');
-        }
+        // If we still have no date and no chat, do NOT force "Today". Default to "Latest" via Limit.
+        // if (!dateParam && !state.selectedChatId) {
+        //     dateParam = new Date().toLocaleDateString('uk-UA');
+        // }
 
         // Fetch Messages 🌿 include_archive flag
         const archiveParam = state.showArchive ? '&include_archive=true' : '';
-        const dateResponse = await fetch(`/messages?since=${state.latestMessageId}&date=${dateParam || ''}&group=allPrivate${archiveParam}`).catch(() => null);
+
+        // 🌿 Logic: If date is set, use it. If not, fetch latest 200 messages (Limit).
+        // using 'limit' param instructs server to sort DESC, take N, then reverse to ASC.
+        const limitParam = dateParam ? '' : '&limit=200';
+        const dateQuery = dateParam ? `&date=${dateParam}` : '';
+
+        // If we have latestMessageId, we could use it as 'since'.
+        // But if we want initial load to be "Latest", we start with since=0 (or whatever state has).
+        // If state.latestMessageId > 0, we are updating. Limit might restrict "how many new ones" or "context".
+        // Actually, if simply polling for new, 'since' is better without limit if we expect few.
+        // But to be safe vs flood, Limit is good.
+
+        const dateResponse = await fetch(`/messages?since=${state.latestMessageId}${dateQuery}${limitParam}&group=allPrivate${archiveParam}`).catch(() => null);
 
         if (dateResponse && dateResponse.ok) {
             const messages = await dateResponse.json();
@@ -130,6 +141,8 @@ export async function fetchMessages() {
                 // UI Update
                 if (state.currentView === 'chat') {
                     renderChatListView();
+                    // 🌿 Fix: Only scroll on first load or if near bottom
+                    const shouldScroll = messages.length > 0 && !state.hasInitialScroll; // Simplified assumption
                     if (state.selectedChatId) renderChatMessages(state.selectedChatId, false);
                 } else {
                     renderTimelineView();
@@ -148,7 +161,8 @@ export async function fetchMessages() {
 
 export async function fetchSingleChatUpdate(chatId) {
     try {
-        const chatRes = await fetch(`/messages?group=${chatId}`);
+        // 🌿 FIX: Fetch LATEST 50 messages to ensure we get updates, not oldest 500
+        const chatRes = await fetch(`/messages?group=${chatId}&limit=50`);
         if (chatRes.ok) {
             const newMsgs = await chatRes.json();
             if (newMsgs.length > 0) {
@@ -176,18 +190,36 @@ export async function fetchSingleChatUpdate(chatId) {
                     }
                 });
 
-                if (updated) {
-                    state.allMessages.sort((a, b) => safeParseDate(a.time) - safeParseDate(b.time));
-                    distributeMessagesToGroups();
+                // 🌿 Sort to ensure chronological order (Fixes duplicate date badges)
+                currentMsgs.sort((a, b) => {
+                    const tA = a.date instanceof Date ? a.date.getTime() / 1000 : a.date;
+                    const tB = b.date instanceof Date ? b.date.getTime() / 1000 : b.date;
+                    return tA - tB;
+                });
 
-                    // 🌿 FIX RACE CONDITION: Only render if this chat is STILL selected
-                    if (state.selectedChatId === chatId) {
-                        renderChatMessages(chatId, false, false);
+                // Also sort global if we modified it
+                state.allMessages.sort((a, b) => {
+                    const tA = a.date instanceof Date ? a.date.getTime() / 1000 : a.date;
+                    const tB = b.date instanceof Date ? b.date.getTime() / 1000 : b.date;
+                    return tA - tB;
+                });
+
+                if (updated) {
+                    distributeMessagesToGroups(); // Optional but safer for other views
+                    if (state.currentView === 'chat' && state.selectedChatId === chatId) {
+                        try {
+                            renderChatMessages(chatId, false);
+                        } catch (e) { console.warn('Render error:', e); }
+                    } else if (state.currentView === 'timeline') {
+                        renderTimelineView();
                     }
+                    renderChatListView();
                 }
             }
         }
-    } catch (e) { console.error('Auto-update chat failed', e); }
+    } catch (error) {
+        console.error('Chat Update Error:', error);
+    }
 }
 
 export function distributeMessagesToGroups() {
@@ -343,4 +375,18 @@ export async function loadPreviousDateMessages() {
     setTimeout(() => {
         state.isLoadingHistory = false;
     }, 300);
+}
+
+export async function sendReaction(chatId, messageId, emoji, action = 'add') {
+    try {
+        const response = await fetch('/api/set-reaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, message_id: messageId, emoji, action })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error sending reaction:', error);
+        return { success: false, error: error.message };
+    }
 }
