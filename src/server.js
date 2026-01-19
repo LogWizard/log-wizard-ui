@@ -366,8 +366,8 @@ export async function createMessageServer() {
                         SELECT photo_url FROM users WHERE id = ? LIMIT 1
                     `, [chat.id]);
 
-                    if (userRows && userRows.length > 0 && userRows[0].photo_url) {
-                        photoUrl = userRows[0].photo_url;
+                    if (userRows && userRows.length > 0 && userRows[0].photo_url && userRows[0].photo_url !== 'none') {
+                        photoUrl = `/api/avatar-image/${chat.id}`; // 🌿 Use our proxy
                     }
                 }
 
