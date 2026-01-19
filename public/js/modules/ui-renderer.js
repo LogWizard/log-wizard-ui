@@ -454,26 +454,20 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
     sorted.forEach(msg => appendMessage(msg, container, lastDate, (d) => lastDate = d));
 
     // 🌿 SCROLL LOGIC (Robust for Images)
-    // - New chat: ALWAYS scroll to bottom and KEEP scrolling while images load
+    // - New chat: ALWAYS scroll to bottom
     if (isNewChat || shouldMsgScrollBottom || wasAtBottom) {
         container.scrollTop = container.scrollHeight;
 
-        // 🌿 Sticky Scroll: Keep forcing bottom for 1.5s to handle layout shifts (images)
-        const stickyDuration = 1500;
-        const stickyStart = Date.now();
-
-        const stickyInterval = setInterval(() => {
-            if (Date.now() - stickyStart > stickyDuration) {
-                clearInterval(stickyInterval);
-            } else {
-                container.scrollTop = container.scrollHeight;
-            }
-        }, 50); // Check every 50ms
-
-        // Also strictly on image load
+        // 🌿 Smart Image Scroll: Only scroll if user is STILL near bottom
+        // This prevents "jumping" if user starts scrolling up while images load
         const images = container.querySelectorAll('img');
         images.forEach(img => {
-            img.onload = () => container.scrollTop = container.scrollHeight;
+            img.onload = () => {
+                const isNearBottom = (container.scrollHeight - container.scrollTop) <= (container.clientHeight + 250);
+                if (isNearBottom) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            };
         });
     }
 
