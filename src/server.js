@@ -265,8 +265,11 @@ export async function createMessageServer() {
 
                 // 🌿 Enrich `from` with server-side user data (including photo_url)
                 if (!msg.from) msg.from = {};
+                // Ensure from.id exists from row data if not in raw_data
+                if (!msg.from.id && row.from_id) msg.from.id = row.from_id;
+
                 // Use proxy endpoint if we have a photo_url in DB
-                if (row.from_photo_url && row.from_photo_url !== 'none') {
+                if (row.from_photo_url && row.from_photo_url !== 'none' && msg.from.id) {
                     msg.from.photo_url = `/api/avatar-image/${msg.from.id}`; // 🌿 Use our proxy
                 } else {
                     msg.from.photo_url = 'none';

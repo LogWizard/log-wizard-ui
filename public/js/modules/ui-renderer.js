@@ -934,8 +934,8 @@ function createMessageBubble(msg, type) {
 
         // 🌿 Backend-Provided Avatar (Fast!)
         let avatarImg = userInitials;
-        if (msg.from?.photo_url && msg.from.photo_url !== 'none') {
-            avatarImg = `<img src="${msg.from.photo_url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.remove(); this.parentElement ? this.parentElement.innerText = '${userInitials}' : null;">`;
+        if (msg.from?.photo_url && msg.from.photo_url !== 'none' && userId) {
+            avatarImg = `<img src="${msg.from.photo_url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerText = '${userInitials}';">`;
         }
 
         // 🌿 Using standard flex item instead of absolute positioning
