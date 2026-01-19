@@ -668,6 +668,12 @@ function createMessageBubble(msg, type) {
 
     // Force alignment style for bot messages to override any CSS conflicts 🌿
     const alignmentStyle = type === 'bot' ? 'justify-content: flex-end;' : 'justify-content: flex-start;';
+
+    // DEBUG: Check reactions on stickers
+    if (isStickerOnly) {
+        console.log(`🖼️ Sticker Msg ${msg.message_id} reactions:`, msg.reactions);
+    }
+
     div.className = `message-bubble ${type} ${isStickerOnly ? 'sticker-only' : ''}`;
     div.style.cssText = alignmentStyle;
 
