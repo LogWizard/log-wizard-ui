@@ -144,15 +144,21 @@ export async function createMessageServer() {
             const includeArchive = urlObj.searchParams.get('include_archive') === 'true';
 
             let tableName = 'messages';
-            let query = `SELECT * FROM ${tableName} WHERE 1=1`;
+            let query = `
+                SELECT m.*, u.photo_url as from_photo_url, u.first_name, u.last_name, u.username
+                FROM ${tableName} m
+                LEFT JOIN users u ON m.from_id = u.id
+                WHERE 1=1
+            `;
             const params = [];
 
-            // 🌿 If archive requested, using UNION or simply querying both if user needs merged view.
-            // Simplified Approach: If includeArchive is true, we query a UNION of both tables.
-            // Or better: We construct the query dynamically.
-
             if (includeArchive) {
-                query = `SELECT * FROM messages WHERE 1=1`;
+                query = `
+                    SELECT m.*, u.photo_url as from_photo_url, u.first_name, u.last_name, u.username
+                    FROM messages m
+                    LEFT JOIN users u ON m.from_id = u.id
+                    WHERE 1=1
+                 `;
             }
 
             // 1. Group / Chat ID Filter
@@ -208,7 +214,12 @@ export async function createMessageServer() {
 
             // 🌿 Fetch from Archive if requested and merge
             if (includeArchive) {
-                let archiveQuery = `SELECT * FROM messages_archive WHERE 1=1`;
+                let archiveQuery = `
+                    SELECT m.*, u.photo_url as from_photo_url, u.first_name, u.last_name, u.username
+                    FROM messages_archive m
+                    LEFT JOIN users u ON m.from_id = u.id
+                    WHERE 1=1
+                `;
                 const archiveParams = [];
 
                 if (group && group !== 'allPrivate') {
@@ -251,6 +262,13 @@ export async function createMessageServer() {
                         text: row.text
                     };
                 }
+
+                // 🌿 Enrich `from` with server-side user data (including photo_url)
+                if (!msg.from) msg.from = {};
+                msg.from.photo_url = row.from_photo_url || 'none';
+                msg.from.first_name = msg.from.first_name || row.first_name;
+                msg.from.last_name = msg.from.last_name || row.last_name;
+                msg.from.username = msg.from.username || row.username;
 
                 // Ensure time is Date object for frontend logic if needed (or keep timestamp)
                 // Frontend expects `time` as Date object in current legacy code?

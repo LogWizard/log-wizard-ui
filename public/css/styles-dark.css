@@ -608,8 +608,8 @@ body {
 .bubble-content {
   min-width: 120px;
   max-width: 440px;
-  padding: 8px 12px 20px 12px;
-  /* Increased bottom padding to prevent time overlap */
+  padding: 8px 12px 35px 12px;
+  /* 🌿 35px bottom padding to prevent time overlap */
   position: relative;
 }
 
@@ -617,6 +617,14 @@ body {
 @media (min-width: 1600px) {
   .bubble-content {
     max-width: 35%;
+  }
+}
+
+/* 🌿 Mobile: Extra padding to prevent time overlap */
+@media (max-width: 768px) {
+  .bubble-content {
+    padding-bottom: 42px !important;
+    /* Extra space for mobile */
   }
 }
 
