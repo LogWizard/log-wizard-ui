@@ -317,3 +317,43 @@ function openSettings() {
     const modal = document.getElementById('settings-modal');
     if (modal) modal.classList.remove('hidden');
 }
+
+// 🌿 Close Chat Navigation
+window.closeChat = function () {
+    setState('selectedChatId', null);
+    state.selectedChatId = null;
+    window.selectedChatId = null;
+
+    // Update URL to home
+    history.pushState({}, '', '/chat');
+
+    // Re-render chat list view
+    renderChatListView();
+
+    console.log('🏠 Closed chat, back to list');
+};
+
+// 🌿 Mobile Back Button
+const mobileBackBtn = document.getElementById('mobileBackBtn');
+if (mobileBackBtn) {
+    mobileBackBtn.addEventListener('click', () => {
+        if (state.selectedChatId) window.closeChat();
+    });
+}
+
+// 🌿 Escape Key - Close Chat
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.selectedChatId) {
+        window.closeChat();
+    }
+});
+
+// 🌿 Click "Chat" tab to close active chat
+const chatViewBtn = document.getElementById('chatViewBtn');
+if (chatViewBtn) {
+    chatViewBtn.addEventListener('click', () => {
+        if (state.selectedChatId) {
+            window.closeChat();
+        }
+    });
+}

@@ -393,450 +393,453 @@ export async function createMessageServer() {
                         }
                     }
                 }
-
-                return {
-                    id: chat.id.toString(), // Ensure string for JS
-                    name: chat.title || chat.username || 'Unknown',
-                    type: chat.type,
-                    photo: photoUrl, // 🌿 Use fetched photo_url
-                    lastMessage: lastMsg || { time: chat.last_updated, text: 'History' },
-                    lastDate: lastMsg?.time || chat.last_updated
-                };
-            }));
-
-            // Filter out nulls (hidden chats)
-            res.json(chatsWithLastMsg.filter(c => c !== null));
-        } catch (e) {
-            console.error('API Error:', e);
-            res.status(500).json([]);
-        }
-    });
-
-    // 🌿 STATS API
-    app.get('/api/stats', async (req, res) => {
-        try {
-            const days = parseInt(req.query.days) || 7;
-            const statsService = new StatsService(MSG_PATH);
-            const stats = await statsService.generateStats(days);
-            res.json(stats);
-        } catch (e) {
-            console.error('Stats Error:', e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    /* Цей роутер відповідає за обробку запиту /chat */
-    app.get('/chat', async (req, res) => {
-        console.log(__dirname);
-        const filePath = path.join(appDirectory, '/public/index.html');
-        console.log(filePath);
-        try {
-            const data = await fs.promises.readFile(filePath);
-            res.status(200).send(data.toString());
-        } catch (err) {
-            res.status(404).send();
-        }
-    });
-    /* Цей роутер відповідає за обробку запиту /chat */
-
-    /* Цей роутер відповідає за обробку всіх інших запитів */
-    // 🌿 Sticker API Routes
-
-    // 1. Get All Sticker Sets (from DB)
-    app.get('/api/sticker-sets', async (req, res) => {
-        const sets = await getStickerSets();
-        res.json(sets);
-    });
-
-    // 2. Import Sticker Set (to DB)
-    app.post('/api/sticker-sets/import', async (req, res) => {
-        const { setName, title } = req.body;
-        if (!setName) return res.status(400).json({ error: 'Name required' });
-
-        try {
-            // Validate with Telegram first
-            const paramsOnConfig = await configManager.read();
-            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
-
-            const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
-            const check = await fetch(url);
-            const data = await check.json();
-
-            if (!data.ok) return res.status(400).json({ error: 'Telegram: ' + data.description });
-
-            // Add to DB
-            await addStickerSet(setName, title || data.result.title);
-            res.json({ success: true, set: data.result });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // 3. Get Stickers from Telegram (Proxy)
-    app.get('/api/stickers/:setName', async (req, res) => {
-        try {
-            const { setName } = req.params;
-            const paramsOnConfig = await configManager.read();
-            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
-
-            if (!token) {
-                console.error('❌ No Bot Token found for stickers!');
-                return res.status(500).json({ error: 'Server Config Error: No Bot Token' });
             }
+                
+                console.log(`🖼️ Chat ${chat.id} photoUrl: ${photoUrl}`);
 
-            const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
+            return {
+                id: chat.id.toString(), // Ensure string for JS
+                name: chat.title || chat.username || 'Unknown',
+                type: chat.type,
+                photo: photoUrl, // 🌿 Use fetched photo_url
+                lastMessage: lastMsg || { time: chat.last_updated, text: 'History' },
+                lastDate: lastMsg?.time || chat.last_updated
+            };
+        }));
 
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (!data.ok) {
-                console.warn(`⚠️ Telegram Error for set ${setName}:`, data.description);
-                return res.status(400).json({ error: data.description });
-            }
-            res.json(data.result);
-        } catch (error) {
-            console.error('Sticker Set Error:', error);
-            res.status(500).json({ error: error.message });
-        }
+    // Filter out nulls (hidden chats)
+    res.json(chatsWithLastMsg.filter(c => c !== null));
+} catch (e) {
+    console.error('API Error:', e);
+    res.status(500).json([]);
+}
     });
 
-    // 4. Sticker Image Proxy
-    app.get('/api/sticker-image/:fileId', async (req, res) => {
-        try {
-            const { fileId } = req.params;
-            const paramsOnConfig = await configManager.read();
-            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
+// 🌿 STATS API
+app.get('/api/stats', async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 7;
+        const statsService = new StatsService(MSG_PATH);
+        const stats = await statsService.generateStats(days);
+        res.json(stats);
+    } catch (e) {
+        console.error('Stats Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
 
-            // 1. Get File Path
-            const pathResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
-            const pathData = await pathResp.json();
+/* Цей роутер відповідає за обробку запиту /chat */
+app.get('/chat', async (req, res) => {
+    console.log(__dirname);
+    const filePath = path.join(appDirectory, '/public/index.html');
+    console.log(filePath);
+    try {
+        const data = await fs.promises.readFile(filePath);
+        res.status(200).send(data.toString());
+    } catch (err) {
+        res.status(404).send();
+    }
+});
+/* Цей роутер відповідає за обробку запиту /chat */
 
-            if (!pathData.ok || !pathData.result.file_path) {
-                return res.status(404).send('File not found');
-            }
+/* Цей роутер відповідає за обробку всіх інших запитів */
+// 🌿 Sticker API Routes
 
-            // 2. Fetch Image Stream
-            const imageUrl = `https://api.telegram.org/file/bot${token}/${pathData.result.file_path}`;
-            const imageResp = await fetch(imageUrl);
+// 1. Get All Sticker Sets (from DB)
+app.get('/api/sticker-sets', async (req, res) => {
+    const sets = await getStickerSets();
+    res.json(sets);
+});
 
-            // Pipe to response
-            const ext = path.extname(pathData.result.file_path);
-            let contentType = 'image/webp';
-            if (ext === '.tgs') contentType = 'application/json'; // Lottie
-            if (ext === '.webm') contentType = 'video/webm';
+// 2. Import Sticker Set (to DB)
+app.post('/api/sticker-sets/import', async (req, res) => {
+    const { setName, title } = req.body;
+    if (!setName) return res.status(400).json({ error: 'Name required' });
 
-            res.setHeader('Content-Type', contentType);
-            res.setHeader('Cache-Control', 'public, max-age=3600');
+    try {
+        // Validate with Telegram first
+        const paramsOnConfig = await configManager.read();
+        const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
 
-            if (imageResp.body && imageResp.body.pipe) {
-                imageResp.body.pipe(res);
-            } else {
-                const buffer = await imageResp.arrayBuffer();
-                res.send(Buffer.from(buffer));
-            }
+        const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
+        const check = await fetch(url);
+        const data = await check.json();
 
-        } catch (error) {
-            console.error('Sticker Image Error:', error);
-            res.status(500).send();
+        if (!data.ok) return res.status(400).json({ error: 'Telegram: ' + data.description });
+
+        // Add to DB
+        await addStickerSet(setName, title || data.result.title);
+        res.json({ success: true, set: data.result });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Get Stickers from Telegram (Proxy)
+app.get('/api/stickers/:setName', async (req, res) => {
+    try {
+        const { setName } = req.params;
+        const paramsOnConfig = await configManager.read();
+        const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
+
+        if (!token) {
+            console.error('❌ No Bot Token found for stickers!');
+            return res.status(500).json({ error: 'Server Config Error: No Bot Token' });
         }
-    });
 
-    // 🌿 Avatar Image Proxy with Physical Caching
-    app.get('/api/avatar-image/:userId', async (req, res) => {
-        try {
-            const { userId } = req.params;
-            const avatarPath = path.join(appDirectory, 'public', 'avatars', `${userId}.jpg`);
+        const url = `https://api.telegram.org/bot${token}/getStickerSet?name=${setName}`;
 
-            // 1. Check if cached file exists
-            if (fs.existsSync(avatarPath)) {
-                console.log(`✅ Serving cached avatar for user ${userId}`);
-                return res.sendFile(avatarPath);
-            }
+        const response = await fetch(url);
+        const data = await response.json();
 
-            const pool = getPool();
-            if (!pool) return res.status(404).send();
+        if (!data.ok) {
+            console.warn(`⚠️ Telegram Error for set ${setName}:`, data.description);
+            return res.status(400).json({ error: data.description });
+        }
+        res.json(data.result);
+    } catch (error) {
+        console.error('Sticker Set Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
-            // 2. Check cooldown for users without avatars
-            const [userRows] = await pool.query(`
+// 4. Sticker Image Proxy
+app.get('/api/sticker-image/:fileId', async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const paramsOnConfig = await configManager.read();
+        const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
+
+        // 1. Get File Path
+        const pathResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+        const pathData = await pathResp.json();
+
+        if (!pathData.ok || !pathData.result.file_path) {
+            return res.status(404).send('File not found');
+        }
+
+        // 2. Fetch Image Stream
+        const imageUrl = `https://api.telegram.org/file/bot${token}/${pathData.result.file_path}`;
+        const imageResp = await fetch(imageUrl);
+
+        // Pipe to response
+        const ext = path.extname(pathData.result.file_path);
+        let contentType = 'image/webp';
+        if (ext === '.tgs') contentType = 'application/json'; // Lottie
+        if (ext === '.webm') contentType = 'video/webm';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+
+        if (imageResp.body && imageResp.body.pipe) {
+            imageResp.body.pipe(res);
+        } else {
+            const buffer = await imageResp.arrayBuffer();
+            res.send(Buffer.from(buffer));
+        }
+
+    } catch (error) {
+        console.error('Sticker Image Error:', error);
+        res.status(500).send();
+    }
+});
+
+// 🌿 Avatar Image Proxy with Physical Caching
+app.get('/api/avatar-image/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const avatarPath = path.join(appDirectory, 'public', 'avatars', `${userId}.jpg`);
+
+        // 1. Check if cached file exists
+        if (fs.existsSync(avatarPath)) {
+            console.log(`✅ Serving cached avatar for user ${userId}`);
+            return res.sendFile(avatarPath);
+        }
+
+        const pool = getPool();
+        if (!pool) return res.status(404).send();
+
+        // 2. Check cooldown for users without avatars
+        const [userRows] = await pool.query(`
                 SELECT avatar_cached, last_avatar_check, photo_url 
                 FROM users WHERE id = ? LIMIT 1
             `, [userId]);
 
-            if (userRows && userRows.length > 0) {
-                const user = userRows[0];
-                const now = Math.floor(Date.now() / 1000);
-                const COOLDOWN_DAYS = 7;
-                const cooldownPassed = (now - user.last_avatar_check) > (COOLDOWN_DAYS * 24 * 60 * 60);
+        if (userRows && userRows.length > 0) {
+            const user = userRows[0];
+            const now = Math.floor(Date.now() / 1000);
+            const COOLDOWN_DAYS = 7;
+            const cooldownPassed = (now - user.last_avatar_check) > (COOLDOWN_DAYS * 24 * 60 * 60);
 
-                // If checked recently and no avatar, skip TG API call
-                if (user.avatar_cached === 0 && !cooldownPassed) {
-                    console.log(`⏰ Cooldown active for user ${userId}, skipping TG API`);
+            // If checked recently and no avatar, skip TG API call
+            if (user.avatar_cached === 0 && !cooldownPassed) {
+                console.log(`⏰ Cooldown active for user ${userId}, skipping TG API`);
+                return res.status(404).send();
+            }
+
+            // 3. Fetch from Telegram API
+            console.log(`🔍 Fetching avatar from Telegram for user ${userId}`);
+
+            const paramsOnConfig = await configManager.read();
+            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'];
+
+            if (!token) {
+                console.error('❌ No Bot Token found!');
+                return res.status(500).send();
+            }
+
+            // Try to use existing photo_url first
+            let photoUrl = user.photo_url;
+
+            // If no photo_url in DB, try getUserProfilePhotos
+            if (!photoUrl || photoUrl === 'none') {
+                const photosResp = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+                const photosData = await photosResp.json();
+
+                if (!photosData.ok || photosData.result.total_count === 0) {
+                    // No avatar - update cooldown
+                    await pool.query(`
+                            UPDATE users SET avatar_cached = 0, last_avatar_check = ? WHERE id = ?
+                        `, [now, userId]);
+                    console.log(`❌ No avatar for user ${userId}, cooldown set`);
                     return res.status(404).send();
                 }
 
-                // 3. Fetch from Telegram API
-                console.log(`🔍 Fetching avatar from Telegram for user ${userId}`);
+                // Get file_id of the largest photo
+                const photos = photosData.result.photos[0];
+                const largestPhoto = photos[photos.length - 1];
+                const fileId = largestPhoto.file_id;
 
-                const paramsOnConfig = await configManager.read();
-                const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'];
+                // Get file path
+                const fileResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+                const fileData = await fileResp.json();
 
-                if (!token) {
-                    console.error('❌ No Bot Token found!');
-                    return res.status(500).send();
-                }
+                if (!fileData.ok) throw new Error('Failed to get file path');
 
-                // Try to use existing photo_url first
-                let photoUrl = user.photo_url;
+                photoUrl = `https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`;
+            }
 
-                // If no photo_url in DB, try getUserProfilePhotos
-                if (!photoUrl || photoUrl === 'none') {
-                    const photosResp = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
-                    const photosData = await photosResp.json();
+            // Download and save avatar
+            const avatarResp = await fetch(photoUrl);
+            if (!avatarResp.ok) throw new Error('Failed to download avatar');
 
-                    if (!photosData.ok || photosData.result.total_count === 0) {
-                        // No avatar - update cooldown
-                        await pool.query(`
-                            UPDATE users SET avatar_cached = 0, last_avatar_check = ? WHERE id = ?
-                        `, [now, userId]);
-                        console.log(`❌ No avatar for user ${userId}, cooldown set`);
-                        return res.status(404).send();
-                    }
+            const buffer = await avatarResp.arrayBuffer();
+            fs.writeFileSync(avatarPath, Buffer.from(buffer));
 
-                    // Get file_id of the largest photo
-                    const photos = photosData.result.photos[0];
-                    const largestPhoto = photos[photos.length - 1];
-                    const fileId = largestPhoto.file_id;
-
-                    // Get file path
-                    const fileResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
-                    const fileData = await fileResp.json();
-
-                    if (!fileData.ok) throw new Error('Failed to get file path');
-
-                    photoUrl = `https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`;
-                }
-
-                // Download and save avatar
-                const avatarResp = await fetch(photoUrl);
-                if (!avatarResp.ok) throw new Error('Failed to download avatar');
-
-                const buffer = await avatarResp.arrayBuffer();
-                fs.writeFileSync(avatarPath, Buffer.from(buffer));
-
-                // Update DB
-                await pool.query(`
+            // Update DB
+            await pool.query(`
                     UPDATE users SET avatar_cached = 1, last_avatar_check = ? WHERE id = ?
                 `, [now, userId]);
 
-                console.log(`✅ Avatar cached for user ${userId}`);
+            console.log(`✅ Avatar cached for user ${userId}`);
 
-                res.setHeader('Content-Type', 'image/jpeg');
-                res.setHeader('Cache-Control', 'public, max-age=86400');
-                return res.send(Buffer.from(buffer));
-            }
-
-            res.status(404).send();
-        } catch (error) {
-            console.error('Avatar fetch error:', error);
-            res.status(404).send();
+            res.setHeader('Content-Type', 'image/jpeg');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.send(Buffer.from(buffer));
         }
-    });
 
-    // 🌿 Static Files (Avatars) - Serve cached avatars
-    app.use('/avatars', express.static(path.join(appDirectory, 'public', 'avatars')));
-
-    // 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
-    app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
-
-    // 🌿 Static Files (Assets)
-    app.use(express.static(path.join(appDirectory, 'public')));
-
-    app.get(/^\/(css|fonts|js)\//i, (req, res) => {
-        // Use req.path to ignore query parameters like ?v=2 🌿
-        const filePath = path.join(appDirectory, 'public', req.path);
-        const fileExtension = path.extname(filePath);
-        const contentType = fileTypes[fileExtension] || 'application/octet-stream';
-        fs.readFile(filePath, (err, content) => {
-            if (err) {
-                if (err.code === 'ENOENT') {
-                    res.status(404).send();
-                } else { // Server error.
-                    res.status(500).send(`Server error: ${err.code}`);
-                }
-            } else {
-                res.status(200).type(contentType).send(content);
-            }
-        });
-    });
-    /* Цей роутер відповідає за обробку всіх інших запитів */
-
-    /* from use https server */
-    server.listen(port, () => {
-        logStr = 'https://';
-        console.log(`Express server started on port ${port}`);
-    });
-    /* from use https server */
-
-    /* from use http server */
-    // app.listen(port, () => {
-    //     logStr = 'http://';
-    //     console.log(`Express server started on port ${port}`);
-    // });
-    /* from use http server */
-
-    async function writeConfigPrams(params) {
-        const configData = configManager.read();
-        Object.assign(configData, params);
-        configManager.write(configData);
+        res.status(404).send();
+    } catch (error) {
+        console.error('Avatar fetch error:', error);
+        res.status(404).send();
     }
-    function formatDate(date, time = false, tHour = false) {
-        let d = new Date(date),
-            month = '' + (d.getMonth() + 1),
-            day = '' + d.getDate(),
-            year = d.getFullYear(),
-            hour = '' + d.getHours(),
-            minutes = '' + d.getMinutes(),
-            seconds = '' + d.getSeconds();
-        if (month.length < 2)
-            month = '0' + month;
+});
 
-        if (day.length < 2)
-            day = '0' + day;
+// 🌿 Static Files (Avatars) - Serve cached avatars
+app.use('/avatars', express.static(path.join(appDirectory, 'public', 'avatars')));
 
-        if (hour.length < 2)
-            hour = '0' + hour;
+// 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
+app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
 
-        if (minutes.length < 2)
-            minutes = '0' + minutes;
+// 🌿 Static Files (Assets)
+app.use(express.static(path.join(appDirectory, 'public')));
 
-        if (seconds.length < 2)
-            seconds = '0' + seconds;
-        if (tHour) {
-            return `${[hour, minutes].join(':')}`;
-        }
-        if (time) {
-            return `${[day, month, year].join('.')} ${[hour, minutes, seconds].join(':')}`;
+app.get(/^\/(css|fonts|js)\//i, (req, res) => {
+    // Use req.path to ignore query parameters like ?v=2 🌿
+    const filePath = path.join(appDirectory, 'public', req.path);
+    const fileExtension = path.extname(filePath);
+    const contentType = fileTypes[fileExtension] || 'application/octet-stream';
+    fs.readFile(filePath, (err, content) => {
+        if (err) {
+            if (err.code === 'ENOENT') {
+                res.status(404).send();
+            } else { // Server error.
+                res.status(500).send(`Server error: ${err.code}`);
+            }
         } else {
-            return `${[day, month, year].join('.')}`;
+            res.status(200).type(contentType).send(content);
         }
+    });
+});
+/* Цей роутер відповідає за обробку всіх інших запитів */
 
+/* from use https server */
+server.listen(port, () => {
+    logStr = 'https://';
+    console.log(`Express server started on port ${port}`);
+});
+/* from use https server */
+
+/* from use http server */
+// app.listen(port, () => {
+//     logStr = 'http://';
+//     console.log(`Express server started on port ${port}`);
+// });
+/* from use http server */
+
+async function writeConfigPrams(params) {
+    const configData = configManager.read();
+    Object.assign(configData, params);
+    configManager.write(configData);
+}
+function formatDate(date, time = false, tHour = false) {
+    let d = new Date(date),
+        month = '' + (d.getMonth() + 1),
+        day = '' + d.getDate(),
+        year = d.getFullYear(),
+        hour = '' + d.getHours(),
+        minutes = '' + d.getMinutes(),
+        seconds = '' + d.getSeconds();
+    if (month.length < 2)
+        month = '0' + month;
+
+    if (day.length < 2)
+        day = '0' + day;
+
+    if (hour.length < 2)
+        hour = '0' + hour;
+
+    if (minutes.length < 2)
+        minutes = '0' + minutes;
+
+    if (seconds.length < 2)
+        seconds = '0' + seconds;
+    if (tHour) {
+        return `${[hour, minutes].join(':')}`;
     }
-    async function getDirectories(path) {
-        if (fs.existsSync(path)) {
-            const entries = await fsp.readdir(path, { withFileTypes: true });
-            const directories = entries.filter((entry) => entry.isDirectory());
-            return directories.map((directory) => directory.name);
-        }
+    if (time) {
+        return `${[day, month, year].join('.')} ${[hour, minutes, seconds].join(':')}`;
+    } else {
+        return `${[day, month, year].join('.')}`;
     }
-    async function urlReplaser(obj) {
-        const paramsOnConfig = await configManager.read();
-        const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
-        // Debug 🌿
-        const hasSticker = !!obj.sticker;
-        const hasPhoto = !!obj.photo;
-        const file_id = await findFileId(obj);
+}
+async function getDirectories(path) {
+    if (fs.existsSync(path)) {
+        const entries = await fsp.readdir(path, { withFileTypes: true });
+        const directories = entries.filter((entry) => entry.isDirectory());
+        return directories.map((directory) => directory.name);
+    }
+}
+async function urlReplaser(obj) {
+    const paramsOnConfig = await configManager.read();
+    const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
 
-        if ((hasSticker || hasPhoto) && !obj.url_sticker && !obj.url_photo) {
-            // console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
-        }
+    // Debug 🌿
+    const hasSticker = !!obj.sticker;
+    const hasPhoto = !!obj.photo;
+    const file_id = await findFileId(obj);
 
-        // Check if we have existing url_* field to refresh
-        const regex = /\"url_.+?\"/;
-        const match = JSON.stringify(obj).match(regex);
+    if ((hasSticker || hasPhoto) && !obj.url_sticker && !obj.url_photo) {
+        // console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
+    }
 
-        if (match) {
-            // Existing url field - refresh it
-            if (file_id && token) {
-                try {
-                    const newUrl = await getFileUrl(token, file_id);
-                    const urlKey = match[0].replaceAll('"', '');
-                    obj[urlKey] = newUrl;
-                } catch (e) {
-                    console.warn('Failed to refresh URL:', e.message);
-                }
-            }
-            return obj;
-        }
+    // Check if we have existing url_* field to refresh
+    const regex = /\"url_.+?\"/;
+    const match = JSON.stringify(obj).match(regex);
 
-        // No url_* field - try to create one from file_id 🌿
-        if (token && file_id) {
+    if (match) {
+        // Existing url field - refresh it
+        if (file_id && token) {
             try {
                 const newUrl = await getFileUrl(token, file_id);
-                // console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
-                // Determine which url field to set based on message type
-                if (obj.sticker) obj.url_sticker = newUrl;
-                else if (obj.photo) obj.url_photo = newUrl;
-                else if (obj.video) obj.url_video = newUrl;
-                else if (obj.video_note) obj.url_video_note = newUrl;
-                else if (obj.voice) obj.url_voice = newUrl;
-                else if (obj.audio) obj.url_audio = newUrl;
-                else if (obj.animation) obj.url_animation = newUrl;
-                else if (obj.document) obj.url_document = newUrl;
+                const urlKey = match[0].replaceAll('"', '');
+                obj[urlKey] = newUrl;
             } catch (e) {
-                console.warn(`❌ Failed to create URL for msg ${obj.message_id}:`, e.message);
+                console.warn('Failed to refresh URL:', e.message);
             }
-        } else if (!token) {
-            console.warn('⚠️ No BOT_TOKEN found for urlReplaser');
         }
-
         return obj;
     }
-    async function getFileUrl(token, fileId) {
-        const response = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
-        const json = await response.json();
-        if (json.ok && json.result && json.result.file_path) {
-            const fileUrl = `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
-            return fileUrl;
-        } else {
-            throw new Error('Failed to get file URL');
+
+    // No url_* field - try to create one from file_id 🌿
+    if (token && file_id) {
+        try {
+            const newUrl = await getFileUrl(token, file_id);
+            // console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
+            // Determine which url field to set based on message type
+            if (obj.sticker) obj.url_sticker = newUrl;
+            else if (obj.photo) obj.url_photo = newUrl;
+            else if (obj.video) obj.url_video = newUrl;
+            else if (obj.video_note) obj.url_video_note = newUrl;
+            else if (obj.voice) obj.url_voice = newUrl;
+            else if (obj.audio) obj.url_audio = newUrl;
+            else if (obj.animation) obj.url_animation = newUrl;
+            else if (obj.document) obj.url_document = newUrl;
+        } catch (e) {
+            console.warn(`❌ Failed to create URL for msg ${obj.message_id}:`, e.message);
         }
+    } else if (!token) {
+        console.warn('⚠️ No BOT_TOKEN found for urlReplaser');
     }
-    async function getBotTokenFromLink(link) {
-        if (link) {
-            const [firstPart, secondPart] = link.split('/bot');
-            return secondPart.substring(0, secondPart.indexOf('/'));
-        }
+
+    return obj;
+}
+async function getFileUrl(token, fileId) {
+    const response = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+    const json = await response.json();
+    if (json.ok && json.result && json.result.file_path) {
+        const fileUrl = `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
+        return fileUrl;
+    } else {
+        throw new Error('Failed to get file URL');
     }
-    async function findFileId(obj) {
-        let result = { id: undefined, size: 0 };
-        const recursiveFinding = (obj) => {
-            if (typeof obj === "object" && obj != null) {
-                if (Object.prototype.hasOwnProperty.call(obj, "file_id") && typeof obj["file_id"] !== "undefined") {
-                    if (Object.prototype.hasOwnProperty.call(obj, "file_size")) {
-                        if (obj.file_size > result.size) {
-                            result.id = obj.file_id;
-                            result.size = obj.file_size;
-                        }
-                    } else {
+}
+async function getBotTokenFromLink(link) {
+    if (link) {
+        const [firstPart, secondPart] = link.split('/bot');
+        return secondPart.substring(0, secondPart.indexOf('/'));
+    }
+}
+async function findFileId(obj) {
+    let result = { id: undefined, size: 0 };
+    const recursiveFinding = (obj) => {
+        if (typeof obj === "object" && obj != null) {
+            if (Object.prototype.hasOwnProperty.call(obj, "file_id") && typeof obj["file_id"] !== "undefined") {
+                if (Object.prototype.hasOwnProperty.call(obj, "file_size")) {
+                    if (obj.file_size > result.size) {
                         result.id = obj.file_id;
+                        result.size = obj.file_size;
                     }
                 } else {
-                    for (let key in obj) {
-                        recursiveFinding(obj[key]);
-                    }
+                    result.id = obj.file_id;
+                }
+            } else {
+                for (let key in obj) {
+                    recursiveFinding(obj[key]);
                 }
             }
-        };
-        recursiveFinding(obj);
-        return result.id;
+        }
+    };
+    recursiveFinding(obj);
+    return result.id;
+}
+
+
+function getOSFromUA(userAgent) {
+    if (/Windows/.test(userAgent)) {
+        return 'Windows';
     }
 
-
-    function getOSFromUA(userAgent) {
-        if (/Windows/.test(userAgent)) {
-            return 'Windows';
-        }
-
-        if (/Mac OS/.test(userAgent)) {
-            return 'macOS';
-        }
-
-        if (/Linux/.test(userAgent)) {
-            return 'Linux';
-        }
-
-        // if no match
-        return null;
+    if (/Mac OS/.test(userAgent)) {
+        return 'macOS';
     }
+
+    if (/Linux/.test(userAgent)) {
+        return 'Linux';
+    }
+
+    // if no match
+    return null;
+}
 }
