@@ -1,6 +1,7 @@
 // ========== Chat List Rendering 🌿 ==========
 
 import { state, elements } from './config.js';
+import { avatarManager } from './modules/avatar-manager.js';
 
 /**
  * Group messages by user
@@ -88,10 +89,23 @@ function createChatListItem(chat) {
     if (lastMsg.animation) preview = '🎬 GIF';
     if (lastMsg.document) preview = '📎 ' + (lastMsg.document.file_name || 'Document');
 
+    // Generate Avatar HTML
+    const avatarUrl = avatarManager.getAvatar(chat.id, (newUrl) => {
+        // Callback: update cached chat list items if they are still in DOM
+        // Find specific img by some ID or class? Or just re-render is too heavy.
+        // We will query selector by data-chat-id
+        const img = document.querySelector(`.chat-item[data-chat-id="${chat.id}"] .chat-item-avatar img`);
+        if (img && newUrl) {
+            img.src = newUrl;
+        }
+    });
+
+    div.setAttribute('data-chat-id', chat.id);
+
     div.innerHTML = `
         <div class="chat-item-avatar">
-            ${lastMsg.user_avatar_url
-            ? `<img src="${lastMsg.user_avatar_url}" alt="${chat.name}" loading="lazy">`
+            ${avatarUrl
+            ? `<img src="${avatarUrl}" alt="${chat.name}" loading="lazy">`
             : `<div class="avatar-placeholder">${chat.name.charAt(0).toUpperCase()}</div>`
         }
         </div>
@@ -104,6 +118,22 @@ function createChatListItem(chat) {
         </div>
         ${chat.messages.length > 1 ? `<div class="chat-item-badge">${chat.messages.length}</div>` : ''}
     `;
+
+    // 🌿 If no URL initially, subscribe to update (handled in getAvatar callback)
+    // If we wanted to preserve the placeholder DOM element when img loads...
+    // The simplified version above just eventually swaps src if img exists, 
+    // BUT we render a DIV if no url. So we need a container to swap.
+
+    if (!avatarUrl) {
+        // We rendered a placeholder div. We need a way to swap it to an img when loaded.
+        avatarManager.getAvatar(chat.id, (newUrl) => {
+            if (!newUrl) return;
+            const item = document.querySelector(`.chat-item[data-chat-id="${chat.id}"] .chat-item-avatar`);
+            if (item) {
+                item.innerHTML = `<img src="${newUrl}" alt="${chat.name}" loading="lazy" class="fade-in">`;
+            }
+        });
+    }
 
     div.addEventListener('click', () => selectChat(chat.id));
 

@@ -1,6 +1,7 @@
-import { state, setState, loadState } from './modules/state.js';
+import { state, setState, loadState, saveState } from './modules/state.js';
 import { fetchMessages, loadPreviousDateMessages, setSettingsToServer } from './modules/api.js';
 import { renderChatListView, renderChatMessages, renderTimelineView, showEmptyMessagesState } from './modules/ui-renderer.js';
+import { StatsDashboard } from './modules/stats-dashboard.js'; // 🌿 Stats
 import { formatDate } from './modules/utils.js';
 
 // ========== Telegram-Style Chat Interface 🌿🦆 ==========
@@ -29,13 +30,27 @@ function init() {
 
     setupEventListeners();
     // Smart Polling Loop (Prevents overlap) 🌿
+    let isPolling = false;
     const pollingLoop = async () => {
+        if (isPolling) return; // 🌿 Skip if previous request is still running
+        isPolling = true;
+
         try {
             await fetchMessages();
+            // 🌿 Force re-render for Timeline if active
+            if (state.currentView === 'timeline') {
+                renderTimelineView(false); // false = no clear, incremental
+            } else if (state.currentView === 'chat' && state.selectedChatId) {
+                // For chat view, we usually rely on renderChatMessages being called inside fetchMessages triggers
+                // OR we can explicitly call it here if fetchMessages just updates state
+                renderChatMessages(state.selectedChatId, false, false);
+            }
         } catch (e) {
             console.error('Polling error:', e);
+        } finally {
+            isPolling = false;
+            setTimeout(pollingLoop, 4000); // 🌿 Wait 4s AFTER completion
         }
-        setTimeout(pollingLoop, 3000);
     };
     pollingLoop();
 
@@ -56,6 +71,27 @@ function init() {
 
     if (state.ui.manualModeToggle) {
         state.ui.manualModeToggle.addEventListener('change', window.handleManualModeToggle);
+    }
+
+    // 🌿 Archive Toggle Listener
+    const archiveToggle = document.getElementById('archiveToggleBtn');
+    if (archiveToggle) {
+        // Init from state
+        archiveToggle.checked = state.showArchive || false;
+
+        archiveToggle.addEventListener('change', async (e) => {
+            const isChecked = e.target.checked;
+            setState('showArchive', isChecked);
+            console.log('🌿 Archive Mode:', isChecked);
+
+            // Reload with reset
+            state.allMessages = [];
+            state.latestMessageId = 0;
+            state.chatGroups = {};
+            await fetchMessages();
+            // Save state to persist preference
+            saveState();
+        });
     }
 }
 
@@ -87,7 +123,13 @@ function setupEventListeners() {
     // Views
     state.ui.chatViewBtn.addEventListener('click', () => switchView('chat'));
     state.ui.timelineViewBtn.addEventListener('click', () => switchView('timeline'));
-    state.ui.statsViewBtn.addEventListener('click', () => switchView('stats'));
+    // Stats button handled by StatsDashboard class 🌿
+
+    // Init UI Renderer
+    // Removed invalid init call
+
+    // 🌿 Init Stats Dashboard
+    const statsDashboard = new StatsDashboard();
 
     // Search
     if (state.ui.chatSearchInput) {
@@ -105,11 +147,18 @@ function setupEventListeners() {
     // Infinite Scroll
     state.ui.messagesContainer.addEventListener('scroll', handleInfiniteScroll);
 
-    // Settings Dialog (Legacy jQuery)
-    // Settings Dialog (Legacy jQuery)
-    // Use local function reference (hoisted)
-    $(document).on('click', '#settings-btn', openSettings);
-    initSettingsDialog();
+    // Settings Dialog (Vanilla JS 🌿)
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            // Ensure function exists globally or locally
+            if (typeof openSettings === 'function') openSettings();
+            else console.error('openSettings function missing');
+        });
+    }
+
+    // Initialize Modal Logic (Close buttons etc)
+    if (typeof initSettingsDialog === 'function') initSettingsDialog();
 }
 
 function switchView(view) {
@@ -134,12 +183,13 @@ function switchView(view) {
         } else {
             // Spinner тільки якщо нема повідомлень
             state.ui.messagesContainer.innerHTML = `
-                <div class="loading-spinner-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888;">
+    < div class="loading-spinner-container" style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888;" >
                     <div class="spinner" style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #4ade80; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
                     <div class="loading-text">Завантажую Timeline... 🌿</div>
-                </div>
-                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-            `;
+                </div >
+    <style>@keyframes spin {0 % { transform: rotate(0deg); } 100% {transform: rotate(360deg); } }</style>
+`;
+
             // Fetch і потім рендер
             fetchMessages().then(() => {
                 if (state.allMessages.length > 0) {
@@ -151,7 +201,7 @@ function switchView(view) {
 }
 
 function handleInfiniteScroll() {
-    if (state.ui.messagesContainer.scrollTop < 200 && !state.isLoadingHistory) {
+    if (state.ui.messagesContainer.scrollTop < 500 && !state.isLoadingHistory) {
         // Logic to determine if we load per chat or timeline is slightly handled inside loadPreviousDateMessages via state.currentView, 
         // BUT we need to make sure we have a selected chat if in chat mode.
         if (state.currentView === 'chat' && !state.selectedChatId) return;
@@ -169,7 +219,7 @@ function initCalendar() {
                     setState('selectedDate', dates[0]);
                     const badge = document.getElementById('selectedDateBadge');
                     const text = document.getElementById('selectedDateText');
-                    if (text) text.textContent = `📅 ${dates[0]}`;
+                    if (text) text.textContent = `📅 ${dates[0]} `;
                     if (badge) badge.style.display = 'flex';
                     calendar.hide();
                     state.ui.calendarPopup.style.display = 'none';
@@ -213,25 +263,38 @@ function initCalendar() {
 }
 
 function initSettingsDialog() {
-    // Legacy jQuery dialog
-    if (window.$ && window.$.fn.dialog) {
-        $("#dialog").dialog({
-            autoOpen: false, width: "40%", modal: true, closeText: "X",
-            buttons: {
-                "Save": async function () {
-                    const data = {
-                        'Listening Port': $('#listeningPort').val(),
-                        'Listening Path': $('#listeningPath').val(),
-                        'Cors Server Port': $('#corsServerPort').val(),
-                        'Date': formatDate($('#selectDate').val())
-                    };
-                    await setSettingsToServer(data);
-                    $(this).dialog("close");
-                    setState('allMessages', []);
-                    setState('latestMessageId', 0);
-                    await fetchMessages();
-                },
-                Cancel: function () { $(this).dialog("close"); }
+    // 🌿 Settings Modal Logic (Vanilla JS)
+
+    // Close Button
+    const closeBtn = document.getElementById('closeSettingsBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            const modal = document.getElementById('settings-modal');
+            if (modal) modal.classList.add('hidden');
+        });
+    }
+
+    // Close on Outside Click
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Reset Cache Logic
+    const resetBtn = document.getElementById('resetCacheBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            // Confirm with a nicer interaction if possible, but browser confirm is safe
+            if (confirm('Це видалить весь локальний кеш і виправить "повідомлення-примари". Продовжити?')) {
+                console.log('🧹 Clearing application cache...');
+                localStorage.removeItem('gys_chat_state');
+                localStorage.removeItem('avatarbox_cache');
+                // Optional: clear other keys?
+                location.reload();
             }
         });
     }
@@ -242,5 +305,6 @@ window.openSettings = openSettings;
 window.switchView = switchView;
 
 function openSettings() {
-    if (window.$ && window.$.fn.dialog) $("#dialog").dialog("open");
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.remove('hidden');
 }

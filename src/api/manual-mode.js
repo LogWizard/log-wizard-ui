@@ -31,7 +31,7 @@ async function saveConfig(config) {
  * GET /api/get-manual-mode?chat_id=123
  */
 export async function getManualMode(req, res) {
-    const { chat_id } = req.query;
+    const chat_id = req.query?.chat_id;
 
     if (!chat_id) {
         return res.status(400).json({ error: 'chat_id required' });

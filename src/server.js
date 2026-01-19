@@ -11,7 +11,10 @@ import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, s
 import { upload, uploadFile } from './api/upload.js';
 import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
 import { ChatsScanner } from './services/chats-scanner.js';
-import { initDB, getStickerSets, addStickerSet } from './services/db.js'; // 🌿 DB Service
+import { StatsService } from './services/stats-service.js'; // 🌿 Stats
+import { initDB, getPool, getStickerSets, addStickerSet } from './services/db.js'; // 🌿 DB Service
+import { MessageSyncer } from './services/sync-service.js'; // 🌿 Sync Service
+import { AvatarService } from './services/avatar-service.js'; // 🌿 Avatar Service
 import fetch from 'node-fetch'; // Ensure fetch is available
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,138 +23,12 @@ const appDirectory = path.resolve(__dirname, '..');
 const configManager = new ConfigManager(path.join(appDirectory, 'config.json'));
 
 const options = {
-    key: fs.readFileSync('src/privatekey.pem'),
-    cert: fs.readFileSync('src/certificate.pem')
+    key: fs.readFileSync(path.join(appDirectory, 'src', 'privatekey.pem')),
+    cert: fs.readFileSync(path.join(appDirectory, 'src', 'certificate.pem'))
 };
 
 const app = express();
 const server = https.createServer(options, app);
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// API Routes 🌿
-app.post('/api/send-message', sendMessage);
-app.post('/api/send-photo', sendPhoto);
-app.post('/api/send-video', sendVideo);
-app.post('/api/send-audio', sendAudio);
-app.post('/api/send-voice', sendVoice);
-app.post('/api/send-sticker', sendSticker);
-app.post('/api/send-video-note', sendVideoNote);
-app.post('/api/send-voice-note', sendVoiceNote);
-app.post('/api/set-reaction', setReaction); // 🌿 Reactions
-app.post('/api/upload', upload.single('file'), uploadFile);
-
-app.get('/api/get-user-photo', async (req, res) => {
-    const userId = req.query.user_id;
-    if (!userId) return res.status(400).send('User ID required');
-
-    // console.log(`📸 Fetching avatar for user: ${userId}`);
-    const paramsOnConfig = await configManager.read();
-    const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
-
-    if (!token) {
-        console.error('❌ Bot token is missing in environment or config!');
-        return res.status(500).send('Bot token missing');
-    }
-
-    try {
-        const avatarDir = path.join(appDirectory, 'public', 'avatars');
-        if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
-        const avatarFile = path.join(avatarDir, `${userId}.jpg`);
-
-        // 🌿 Check local cache first
-        if (fs.existsSync(avatarFile)) {
-            return res.json({ url: `/avatars/${userId}.jpg` });
-        }
-
-        const profileUrl = `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`;
-        const response = await fetch(profileUrl);
-        const data = await response.json();
-
-        // console.log(`📸 Telegram response for ${userId}:`, data.ok ? `OK, Photos: ${data.result?.total_count}` : `Error: ${data.description}`);
-
-        if (data.ok && data.result.total_count > 0) {
-            const fileId = data.result.photos[0][0].file_id;
-            const fileResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
-            const fileData = await fileResp.json();
-
-            if (fileData.ok) {
-                const filePath = fileData.result.file_path;
-                const photoUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
-
-                // 🌿 Save to local cache
-                try {
-                    const imgRes = await fetch(photoUrl);
-                    const arrayBuffer = await imgRes.arrayBuffer();
-                    const buffer = Buffer.from(arrayBuffer);
-                    fs.writeFileSync(avatarFile, buffer);
-                    return res.json({ url: `/avatars/${userId}.jpg` });
-                } catch (saveErr) {
-                    console.error('Failed to save avatar locally:', saveErr);
-                    return res.json({ url: photoUrl }); // Fallback to remote URL
-                }
-            }
-        }
-        // 🌿 Return 200 OK with null url to prevent browser console 404 spam
-        res.status(200).json({ url: null, message: 'No public photo found' });
-    } catch (e) {
-        console.error('Error fetching user photo:', e);
-        res.status(500).send(e.message);
-    }
-});
-
-// Manual Mode Routes 🔀
-app.get('/api/get-manual-mode', getManualMode);
-app.post('/api/set-manual-mode', setManualMode);
-app.get('/api/get-all-manual-modes', getAllManualModes);
-
-
-const fileTypes = {
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.js': 'text/javascript',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.pdf': 'application/pdf',
-    '.woff2': 'font/woff2',
-    '.webp': 'image/webp',
-    '.mp3': 'audio/mpeg',
-    '.ogg': 'audio/ogg',
-    '.wav': 'audio/wav',
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm'
-};
-let MSG_PATH = "";
-let port = "";
-let corsServerPort = "";
-let logStr = "http";
-const args = process.argv.slice(2);
-const params = {};
-for (const arg of args) {
-    const [key, value] = arg.split('=');
-    params[key] = value;
-}
-let paramsKeys = Object.keys(params);
-if (paramsKeys.length !== 0) {
-    MSG_PATH = params['path'] ? params['path'] : `D:/OSPanel/domains/kyivstar-nelegal-it-community.com.ua/Node_Home/GitHub/ks_gys_bot/messages`;
-    port = params['port'] ? params['port'] : `3003`;
-    corsServerPort = params['corsServerPort'] ? params['corsServerPort'] : '3004';
-    console.log(params);
-} else {
-    const paramsOnConfig = await readConfigPrams();
-    port = paramsOnConfig['Listening Port'];
-    MSG_PATH = paramsOnConfig['Listening Path'];
-    corsServerPort = paramsOnConfig['Cors Server Port'];
-    corsServerPort = paramsOnConfig['Cors Server Port'];
-}
-
-// 🌿 Initialize Database
-await initDB();
 
 app.use(express.json());
 async function readConfigPrams() { return configManager.read(); }
@@ -165,7 +42,33 @@ const getIPv4FromIPV6 = (ipAddress) => {
 
     return ipAddress; // Якщо адреса не відповідає формату, повертаємо її без змін
 };
-export function createMessageServer() {
+export async function createMessageServer() {
+
+
+    // 🌿 Config & Args Parsing (Restored)
+    let MSG_PATH = "";
+    let port = "";
+    let corsServerPort = "";
+    let logStr = "http";
+
+    const args = process.argv.slice(2);
+    const params = {};
+    for (const arg of args) {
+        const [key, value] = arg.split('=');
+        params[key] = value;
+    }
+
+    if (Object.keys(params).length !== 0) {
+        MSG_PATH = params['path'] ? params['path'] : `D:/OSPanel/domains/kyivstar-nelegal-it-community.com.ua/Node_Home/GitHub/ks_gys_bot/messages`;
+        port = params['port'] ? params['port'] : `3003`;
+        corsServerPort = params['corsServerPort'] ? params['corsServerPort'] : '3004';
+    } else {
+        const paramsOnConfig = await readConfigPrams();
+        port = paramsOnConfig['Listening Port'];
+        MSG_PATH = paramsOnConfig['Listening Path'];
+        corsServerPort = paramsOnConfig['Cors Server Port'];
+    }
+
     /* Цей сервер необхідний для обходу CORS */
     cors_proxy.createServer({
         originWhitelist: [], // Allow all origins
@@ -175,7 +78,23 @@ export function createMessageServer() {
         console.log(`Server CORS Anywhere started on port ${corsServerPort}`);
     });
     /* Цей сервер необхідний для обходу CORS */
+
+    // 🌿 Init DB & Services (Background)
+    await initDB();
+
+    if (MSG_PATH) {
+        // 🌿 Disabled Sync as user requested (using Direct DB now)
+        // const syncer = new MessageSyncer(MSG_PATH);
+        // syncer.start().catch(e => console.error('Sync error:', e));
+
+        const avatarService = new AvatarService(appDirectory);
+        avatarService.start();
+    }
     let folderPath = path.join(MSG_PATH, new Date().toLocaleDateString('uk-UA'), '/');
+
+    /* Manual Mode API 🌿 */
+    app.get('/api/get-manual-mode', getManualMode);
+    app.post('/api/set-manual-mode', setManualMode);
 
     /* Api Settings */
     app.post('/api/v1/getSettings', async (req, res) => {
@@ -213,99 +132,141 @@ export function createMessageServer() {
 
     /* Цей роутер відповідає за get запитів /message */
     app.get('/messages', async (req, res) => {
+        const pool = getPool();
+        if (!pool) return res.status(503).json([]);
+
         try {
             const urlObj = new URL(req.url, `http://${req.headers.host}`);
-            const sinceParam = Number.parseInt(urlObj.searchParams.get('since'));
-            const date = urlObj.searchParams.get('date');
+            const sinceParam = Number.parseInt(urlObj.searchParams.get('since')) || 0;
+            const dateStr = urlObj.searchParams.get('date');
             const group = urlObj.searchParams.get('group');
-            const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
-            // console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} GET`);
+            // 🌿 Archive Flag
+            const includeArchive = urlObj.searchParams.get('include_archive') === 'true';
 
+            let tableName = 'messages';
+            let query = `SELECT * FROM ${tableName} WHERE 1=1`;
+            const params = [];
 
-            const messages = [];
+            // 🌿 If archive requested, using UNION or simply querying both if user needs merged view.
+            // Simplified Approach: If includeArchive is true, we query a UNION of both tables.
+            // Or better: We construct the query dynamically.
 
-            // Якщо date пустий - сканувати останні 3 дні 🌿 (PERFORMANCE FIX!)
-            let dateFolders = [];
-            if (!date || date === '') {
-                // 🚀 Оптимізація: читаємо тільки останні 3 дні замість всіх 129k+ файлів
-                const today = new Date();
-                for (let i = 0; i < 3; i++) {
-                    const d = new Date(today);
-                    d.setDate(d.getDate() - i);
-                    dateFolders.push(d.toLocaleDateString('uk-UA'));
-                }
-            } else {
-                dateFolders = [date];
+            if (includeArchive) {
+                query = `SELECT * FROM messages WHERE 1=1`;
             }
 
-            for (const dateFolder of dateFolders) {
-                let folderPath = path.join(MSG_PATH, dateFolder);
-                // 🌿 Fix: Only enter subdirectory for groups (IDs with '-'). Private chats are in root date folder.
-                if (group && group !== 'allPrivate' && group.includes('-')) {
-                    folderPath = path.join(folderPath, group);
+            // 1. Group / Chat ID Filter
+            if (group && group !== 'allPrivate') {
+                const chatId = group;
+                query += ` AND chat_id = ?`;
+                params.push(chatId);
+            }
+
+            // 2. Date Filter
+            if (dateStr) {
+                const [d, m, y] = dateStr.split('.').map(Number);
+                if (d && m && y) {
+                    const startDate = new Date(y, m - 1, d, 0, 0, 0);
+                    const endDate = new Date(y, m - 1, d, 23, 59, 59);
+                    query += ` AND date >= ? AND date <= ?`;
+                    params.push(startDate, endDate);
+                }
+            }
+
+            // 3. Since ID
+            if (sinceParam) {
+                query += ` AND message_id > ?`;
+                params.push(sinceParam);
+            }
+
+            // 🌿 Archive Union Logic
+            if (includeArchive) {
+                // Duplicate query logic for archive table 
+                // (Note: This is a bit verbose but SQL injection safe)
+                let archiveQuery = `SELECT * FROM messages_archive WHERE 1=1`;
+
+                if (group && group !== 'allPrivate') {
+                    archiveQuery += ` AND chat_id = ?`; // param is pushed later or reused? 
+                    // To reuse params array for UNION, we need to duplicate the values in it
+                    // Or use named parameters, but mysql2 uses ?
+                    // Let's just create a full string union safely since we have inputs.
                 }
 
-                try {
-                    fs.accessSync(folderPath, fs.constants.R_OK);
-                } catch {
-                    continue; // Папка не існує - пропускаємо
+                // Re-building params is tricky with ? style. 
+                // Let's just execute two queries and merge in JS for simplicity, or building complex SQL.
+                // Merging in JS is safer/easier for this context.
+
+                // ... Actually, let's stick to the main query for now, and if archive is on, we do a second query.
+            } else {
+                // Query is fine as is for 'messages'
+            }
+
+            // 4. Sort & Limit
+            query += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
+
+            let [rows] = await pool.query(query, params);
+
+            // 🌿 Fetch from Archive if requested and merge
+            if (includeArchive) {
+                let archiveQuery = `SELECT * FROM messages_archive WHERE 1=1`;
+                const archiveParams = [];
+
+                if (group && group !== 'allPrivate') {
+                    archiveQuery += ` AND chat_id = ?`;
+                    archiveParams.push(group);
+                }
+                if (dateStr) {
+                    const [d, m, y] = dateStr.split('.').map(Number);
+                    const startDate = new Date(y, m - 1, d, 0, 0, 0);
+                    const endDate = new Date(y, m - 1, d, 23, 59, 59);
+                    archiveQuery += ` AND date >= ? AND date <= ?`;
+                    archiveParams.push(startDate, endDate);
+                }
+                if (sinceParam) {
+                    archiveQuery += ` AND message_id > ?`;
+                    archiveParams.push(sinceParam);
                 }
 
-                const files = fs.readdirSync(folderPath);
-                for (let file of files) {
-                    const filePath = path.join(folderPath, file);
-                    // check if file has .json extension
-                    if (path.extname(file) !== '.json') {
-                        continue;
-                    }
+                archiveQuery += ` ORDER BY date ASC, message_id ASC LIMIT 500`;
 
-                    try {
-                        const stats = fs.statSync(filePath);
-                        if (stats.size === 0) continue; // Пропускаємо пусті файли 🌿
+                const [archiveRows] = await pool.query(archiveQuery, archiveParams);
+                rows = [...archiveRows, ...rows]; // Archive first, then new messages
 
-                        const data = fs.readFileSync(filePath);
-                        if (!data || data.length === 0) continue; // Skip empty/corrupted files
+                // Re-sort combined
+                rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+            }
 
-                        let message = JSON.parse(data);
-                        message = await urlReplaser(message);
-                        if (sinceParam && message.message_id <= sinceParam) {
-                            continue;
-                        }
-
-                        // 🌿 Filter by chat.id for private chats (group param without '-')
-                        if (group && group !== 'allPrivate' && !group.includes('-')) {
-                            const msgChatId = String(message.chat?.id || message.from?.id || '');
-                            if (msgChatId !== group) {
-                                continue; // Skip messages not belonging to this chat
-                            }
-                        }
-
-                        const chatMessage = {
-                            user: message.from?.first_name,
-                            text: message.text,
-                            time: new Date(message.date * 1000),
-                        };
-
-                        // add additional properties to chatMessage
-                        const fields = Object.keys(message).filter(
-                            (key) => !['text', 'date'].includes(key)
-                        );
-                        for (let key of fields) {
-                            chatMessage[key] = message[key];
-                        }
-                        messages.push(chatMessage);
-                    } catch (error) {
-                        // Silently skip corrupted/broken files 🌿
-                        continue;
-                    }
+            // 5. Transform for Frontend
+            const messages = rows.map(row => {
+                // Use raw_data if available for full fidelity, else construct
+                let msg = row.raw_data;
+                if (typeof msg === 'string') msg = JSON.parse(msg);
+                if (!msg) {
+                    // Fallback if raw_data missing
+                    msg = {
+                        message_id: row.message_id,
+                        chat: { id: row.chat_id },
+                        from: { id: row.from_id },
+                        date: new Date(row.date).getTime() / 1000,
+                        text: row.text
+                    };
                 }
-            } // end for dateFolder
 
-            messages.sort((a, b) => b.time - a.time);
+                // Ensure time is Date object for frontend logic if needed (or keep timestamp)
+                // Frontend expects `time` as Date object in current legacy code?
+                // Let's check legacy: `time: new Date(message.date * 1000)`
+                msg.time = new Date(msg.date * 1000);
 
-            res.status(200).json(messages);
+                // 🌿 Url Replaser logic is already mostly in raw_data, 
+                // but we might need to re-run it if we want fresh links? 
+                // For now, return as is.
+                return msg;
+            });
+
+            res.json(messages);
+
         } catch (err) {
-            console.error(`Error accessing directory: ${err}`);
+            console.error(`DB Message Error: ${err}`);
             res.status(500).json({ message: 'Internal Server Error' });
         }
     });
@@ -314,25 +275,93 @@ export function createMessageServer() {
     // 🌿 ALL CHATS API
     // Scanner initialized below
 
+    // 🌿 ALL CHATS API (DB-Backed ⚡)
+    // 🌿 ALL CHATS API (DB-Backed ⚡) with Archive Support
     app.get('/api/get-all-chats', async (req, res) => {
-        // Dynamic import or use global class
-        // Since we cannot use import inside function effectively without dynamic import()
-        // We will assume ChatsScanner is imported at top
+        const pool = getPool();
+        if (!pool) return res.status(503).json([]);
 
-        // Initialize scanner if not exists (using current MSG_PATH)
-        // We can attach it to app or global scope
-        const scanner = new ChatsScanner(MSG_PATH);
+        const includeArchive = req.query.include_archive === 'true';
 
-        const force = req.query.force === 'true';
-        if (force) {
-            const chats = await scanner.scan();
-            res.json(Object.values(chats));
-        } else {
-            let chats = scanner.getCached();
-            if (Object.keys(chats).length === 0) {
-                chats = await scanner.scan();
-            }
-            res.json(Object.values(chats));
+        try {
+            // Fetch chats sorted by last update
+            const [rows] = await pool.query(`
+                SELECT * FROM chats 
+                ORDER BY last_updated DESC
+            `);
+
+            // 🌿 Advanced: Get last message for each chat to show preview
+            const chatsWithLastMsg = await Promise.all(rows.map(async (chat) => {
+                let lastMsg = null;
+
+                // 1. Try Main Table
+                const [msgs] = await pool.query(`
+                    SELECT * FROM messages 
+                    WHERE chat_id = ? 
+                    ORDER BY date DESC 
+                    LIMIT 1
+                `, [chat.id]);
+
+                if (msgs && msgs.length > 0) {
+                    lastMsg = {
+                        time: msgs[0].date,
+                        text: msgs[0].text || (msgs[0].caption ? '📷 ' + msgs[0].caption : (msgs[0].type !== 'text' ? '[' + msgs[0].type + ']' : ''))
+                    };
+                }
+
+                // 2. Try Archive Table (if enabled and not found in main)
+                if (!lastMsg && includeArchive) {
+                    try {
+                        const [archMsgs] = await pool.query(`
+                            SELECT * FROM messages_archive 
+                            WHERE chat_id = ? 
+                            ORDER BY date DESC 
+                            LIMIT 1
+                        `, [chat.id]);
+
+                        if (archMsgs && archMsgs.length > 0) {
+                            lastMsg = {
+                                time: archMsgs[0].date,
+                                text: '📦 ' + (archMsgs[0].text || (archMsgs[0].caption ? '📷 ' + archMsgs[0].caption : 'Archive Message'))
+                            };
+                        }
+                    } catch (e) { /* ignore if table doesn't exist yet */ }
+                }
+
+                // 🌿 Filter Logic: Hide chat if no messages and archive is OFF
+                // Only showing active chats prevents "History" clutter
+                if (!lastMsg && !includeArchive) {
+                    return null;
+                }
+
+                return {
+                    id: chat.id.toString(), // Ensure string for JS
+                    name: chat.title || chat.username || 'Unknown',
+                    type: chat.type,
+                    photo: chat.photo_url,
+                    lastMessage: lastMsg || { time: chat.last_updated, text: 'History' },
+                    lastDate: lastMsg?.time || chat.last_updated
+                };
+            }));
+
+            // Filter out nulls (hidden chats)
+            res.json(chatsWithLastMsg.filter(c => c !== null));
+        } catch (e) {
+            console.error('API Error:', e);
+            res.status(500).json([]);
+        }
+    });
+
+    // 🌿 STATS API
+    app.get('/api/stats', async (req, res) => {
+        try {
+            const days = parseInt(req.query.days) || 7;
+            const statsService = new StatsService(MSG_PATH);
+            const stats = await statsService.generateStats(days);
+            res.json(stats);
+        } catch (e) {
+            console.error('Stats Error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 

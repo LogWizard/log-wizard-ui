@@ -12,6 +12,7 @@ export const state = {
     allDatesLoaded: [],
     currentDatePointer: null,
     chatSearchQuery: '',
+    showArchive: false, // 🌿 Archive Toggle
 
     // UI Refs (will be set on init)
     ui: {

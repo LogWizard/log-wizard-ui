@@ -5,6 +5,9 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 🦆 Favicon to stop 404 spam -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦆</text></svg>">
     <link rel="stylesheet" href="/css/styles-dark.css">
     <link rel="stylesheet" href="/css/modules/message-input.css">
     <link rel="stylesheet" href="/css/modules/manual-mode.css">
@@ -16,6 +19,8 @@
     <link href="/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vanilla-calendar-pro/build/vanilla-calendar.min.css">
     <link rel="stylesheet" href="/css/vanilla-calendar-theme.css">
+    <link rel="stylesheet" href="/css/stats.css"> <!-- 🌿 Stats CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- 🌿 Chart.js -->
     <!-- Quill WYSIWYG Editor 🌿 -->
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 
@@ -31,56 +36,148 @@
 
 </head>
 
-<!-- Settings Dialog -->
-<div style="display: none;" id="dialog" title="Settings">
-    <div id="display-settings">
-        <h3>Display Settings</h3>
-        <form>
-            <label for="selectDate">Select Date:</label>
-            <input type="date" name="selectDate" id="selectDate" class="text ui-widget-content ui-corner-all">
+<!-- Settings Modal (Custom 🌿) -->
+<div id="settings-modal" class="modal hidden">
+    <div class="modal-content settings-modal-content">
+        <div class="modal-header">
+            <h2>⚙️ Налаштування</h2>
+            <button class="close-btn" id="closeSettingsBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Archive Toggle -->
+            <div id="archive-settings"
+                style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div
+                            style="width: 44px; height: 44px; background: rgba(100, 181, 246, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64b5f6"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                                <rect x="1" y="3" width="22" height="5"></rect>
+                                <line x1="10" y1="12" x2="14" y2="12"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <div style="font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px;">Показати
+                                архів</div>
+                            <div style="font-size: 13px; color: #8b98a7; line-height: 1.4;">
+                                ⚠️ Можуть бути візуальні глюки/дублі з минулого.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="manual-mode-switch">
+                        <input type="checkbox" id="archiveToggleBtn">
+                        <span class="slider-small"></span>
+                    </label>
+                </div>
+            </div>
 
-            <label for="viewMode">View Mode:</label>
-            <select id="viewMode" class="text ui-widget-content ui-corner-all">
-                <option value="chat">Chat View (по людям)</option>
-                <option value="timeline">Timeline View (всі разом)</option>
-            </select>
-        </form>
-    </div>
-
-    <div id="server-settings">
-        <h3>Server Settings</h3>
-        <form>
-            <label for="listeningPort">Listening Port:<span style="color:red">*</span></label>
-            <input type="text" name="listeningPort" id="listeningPort" value=""
-                class="text ui-widget-content ui-corner-all">
-
-            <label for="listeningPath">Listening Path:</label>
-            <input type="text" name="listeningPath" id="listeningPath" value=""
-                class="text ui-widget-content ui-corner-all">
-
-            <label for="corsServerPort">Cors Server Port:<span style="color:red">*</span></label>
-            <input type="text" name="corsServerPort" id="corsServerPort" value=""
-                class="text ui-widget-content ui-corner-all">
-            <label style="color: brown;" for="">* the application must be restarted</label>
-        </form>
-
+            <!-- Cache Reset Section -->
+            <div id="cache-settings" style="padding: 10px 0;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                    <div
+                        style="width: 44px; height: 44px; background: rgba(239, 68, 68, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px;">Скинути кеш
+                        </div>
+                        <div style="font-size: 13px; color: #8b98a7; line-height: 1.4;">
+                            Виправляє помилки відображення та "примарні" повідомлення.
+                        </div>
+                    </div>
+                </div>
+                <button id="resetCacheBtn" class="ui-button"
+                    style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 12px 20px; cursor: pointer; font-weight: 600; width: 100%; border-radius: 12px; font-size: 14px; transition: all 0.2s; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                        <path d="M16 21h5v-5"></path>
+                    </svg>
+                    Kill Ghosts
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
 
 <body>
+    <!-- Stats Dashboard Modal 🌿 -->
+    <div id="stats-dashboard" class="modal hidden">
+        <div class="modal-content stats-modal">
+            <div class="modal-header">
+                <h2>📊 Statistics Dashboard</h2>
+                <button class="close-btn" id="closeStatsBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-controls" style="margin-bottom: 20px; text-align: right;">
+                    <select id="statsDaysSelect" class="ui-widget-content ui-corner-all" style="padding: 5px;">
+                        <option value="3">Last 3 Days</option>
+                        <option value="7" selected>Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Messages</h3>
+                        <canvas id="chart-messages"></canvas>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Message Types</h3>
+                        <canvas id="chart-types"></canvas>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Top Active Users</h3>
+                        <canvas id="chart-users"></canvas>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Top Commands</h3>
+                        <canvas id="chart-commands"></canvas>
+                    </div>
+                    <div class="stat-card wide">
+                        <h3>Top Words (Cloud)</h3>
+                        <div id="word-cloud-container" class="word-cloud"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Telegram-style Layout 🌿🦆 -->
     <div class="telegram-container">
         <!-- Left Sidebar - Chat List -->
         <div class="chat-list-panel">
             <div class="chat-list-header">
                 <h2>Chats</h2>
-                <button id="settings-btn" class="settings-icon-btn" title="Налаштування">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z" />
-                    </svg>
-                </button>
+                <div class="header-actions">
+                    <!-- Stats Button 📊 (Moved here from view-toggle) -->
+                    <button id="statsViewBtn" class="stats-header-btn" title="📊 Statistics">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </button>
+                    <button id="settings-btn" class="settings-icon-btn" title="Налаштування">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Search Bar з календарем 🌿 -->
@@ -126,15 +223,7 @@
                     </svg>
                     Timeline
                 </button>
-                <button id="statsViewBtn" class="view-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                    Stats
-                </button>
+                <!-- Stats button moved to header 🌿 -->
             </div>
             <div id="chat-list" class="chat-list">
                 <!-- Chat items will be injected here -->
@@ -159,23 +248,16 @@
                     </div>
                 </div>
 
-                <!-- Manual Mode Toggle -->
-                <div class="manual-mode-toggle">
-                    <span class="toggle-label auto" id="toggleLabel">
-                        <svg class="toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <path
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c.79 0 1.5-.71 1.5-1.5S8.79 9 8 9s-1.5.71-1.5 1.5S7.21 11 8 11zm8 0c.79 0 1.5-.71 1.5-1.5S16.79 9 16 9s-1.5.71-1.5 1.5.71 1.5 1.5 1.5zm-4 4c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4z" />
-                        </svg>
-                        Auto
-                    </span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="manualModeToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
+                <!-- Manual Mode Toggle removed from header - available in toolbar only 🌿 -->
             </div>
             <div id="messages-container" class="messages-container">
                 <!-- Messages will be injected here -->
+            </div>
+
+            <!-- 🌿 Chat Loading Overlay -->
+            <div id="chat-loading-overlay">
+                <div class="spinner"></div>
+                <div class="loading-text">Завантажую чат... 🌿</div>
             </div>
 
             <button id="scrollToBottomBtn" class="scroll-to-bottom" title="Scroll to bottom">
@@ -316,7 +398,8 @@
             <!-- Sticker Picker Panel 🌿 -->
             <div id="stickerPicker"
                 style="display: none; position: absolute; bottom: 85px; left: 20px; width: 320px; height: 300px; background: #0e1621; border: 1px solid #2b5278; border-radius: 12px; z-index: 1000; box-shadow: 0 5px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column;">
-                <div style="padding: 10px; border-bottom: 1px solid #2b5278; font-weight: bold; color: #fff;">Stickers
+                <div style="padding: 10px; border-bottom: 1px solid #2b5278; font-weight: bold; color: #fff;">
+                    Stickers
                 </div>
                 <div id="stickersContainer"
                     style="flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">

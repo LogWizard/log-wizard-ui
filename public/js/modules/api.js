@@ -1,6 +1,7 @@
 import { state, setState } from './state.js';
 import { renderChatListView, renderChatMessages, renderTimelineView, showEmptyMessagesState } from './ui-renderer.js';
 import { safeParseDate } from './utils.js';
+import { avatarManager } from './avatar-manager.js'; // 🌿 API module also needs this 
 
 // 🌿 API Interaction Module
 
@@ -38,43 +39,50 @@ export async function fetchMessages() {
     try {
         let dateParam = state.selectedDate || '';
 
-        // 🌿 CHAT LIST UPDATE (Always fetch global list if in chat view)
-        if (state.currentView === 'chat' || dateParam === '') {
-            const response = await fetch('/api/get-all-chats');
+        // 🌿 CHAT LIST UPDATE (Throttled: Fetch list max once every 15s unless no chats loaded)
+        const now = Date.now();
+        if ((state.currentView === 'chat' || dateParam === '') &&
+            (Object.keys(state.chatGroups).length === 0 || now - (state.lastChatListUpdate || 0) > 15000)) {
+
+            state.lastChatListUpdate = now;
+            // 🌿 Archive flag to filter chats
+            const archiveParam = state.showArchive ? '?include_archive=true' : '?include_archive=false';
+            const response = await fetch(`/api/get-all-chats${archiveParam}`);
             if (response.ok) {
                 const chats = await response.json();
-                const groups = { ...state.chatGroups };
-                chats.forEach(c => {
-                    if (groups[c.id]) {
-                        groups[c.id].name = c.name || groups[c.id].name;
-                        if (c.lastMessage && (!groups[c.id].lastMessage || safeParseDate(c.lastMessage.time) > safeParseDate(groups[c.id].lastMessage.time))) {
-                            groups[c.id].lastMessage = c.lastMessage;
-                        }
-                    } else {
-                        groups[c.id] = {
-                            id: c.id,
-                            name: c.name || c.id,
-                            messages: [],
-                            lastDate: c.lastDate || null,
-                            lastMessage: c.lastMessage || { time: null, text: 'History' },
-                            avatar: null
-                        };
-                    }
-                });
-                setState('chatGroups', groups);
-                renderChatListView();
 
-                // 🌿 AUTO-UPDATE ACTIVE CHAT
+                // 🌿 Optimized Chat List Update: Only render if data changed
+                const chatsHash = JSON.stringify(chats.map(c => ({ id: c.id, last: c.lastMessage?.time })));
+                if (state._lastChatsHash !== chatsHash) {
+                    const groups = { ...state.chatGroups };
+                    chats.forEach(c => {
+                        if (groups[c.id]) {
+                            groups[c.id].name = c.name || groups[c.id].name;
+                            if (c.lastMessage && (!groups[c.id].lastMessage || safeParseDate(c.lastMessage.time) > safeParseDate(groups[c.id].lastMessage.time))) {
+                                groups[c.id].lastMessage = c.lastMessage;
+                            }
+                        } else {
+                            groups[c.id] = {
+                                id: c.id,
+                                name: c.name || c.id,
+                                messages: [],
+                                lastDate: c.lastDate || null,
+                                lastMessage: c.lastMessage || { time: null, text: 'History' },
+                                avatar: null
+                            };
+                        }
+                    });
+                    state.chatGroups = groups;
+                    state._lastChatsHash = chatsHash;
+                    renderChatListView();
+                    avatarManager.preloadAvatars(chats);
+                }
+
+                // 🌿 AUTO-UPDATE ACTIVE CHAT (Conditional)
                 if (state.selectedChatId && state.chatGroups[state.selectedChatId] && state.currentView === 'chat') {
                     await fetchSingleChatUpdate(state.selectedChatId);
                 }
             }
-        }
-
-        // 🌿 TIMELINE / DATE / GLOBAL MESSAGES (Sync)
-        // Defaults to 'today' if we are in timeline and no date is set
-        if (state.currentView === 'timeline' && !dateParam) {
-            dateParam = new Date().toLocaleDateString('uk-UA');
         }
 
         // If we still have no date and no chat, and it's not a global sync attempt, we might return
@@ -83,8 +91,9 @@ export async function fetchMessages() {
             dateParam = new Date().toLocaleDateString('uk-UA');
         }
 
-        // Fetch Messages
-        const dateResponse = await fetch(`/messages?since=${state.latestMessageId}&date=${dateParam || ''}&group=allPrivate`).catch(() => null);
+        // Fetch Messages 🌿 include_archive flag
+        const archiveParam = state.showArchive ? '&include_archive=true' : '';
+        const dateResponse = await fetch(`/messages?since=${state.latestMessageId}&date=${dateParam || ''}&group=allPrivate${archiveParam}`).catch(() => null);
 
         if (dateResponse && dateResponse.ok) {
             const messages = await dateResponse.json();
@@ -167,9 +176,11 @@ export async function fetchSingleChatUpdate(chatId) {
                 if (updated) {
                     state.allMessages.sort((a, b) => safeParseDate(a.time) - safeParseDate(b.time));
                     distributeMessagesToGroups();
-                    // renderChatMessages(chatId, false, true); // Avoid full clear on auto-sync!
-                    renderChatMessages(chatId, false, false);
-                    renderChatListView();
+
+                    // 🌿 FIX RACE CONDITION: Only render if this chat is STILL selected
+                    if (state.selectedChatId === chatId) {
+                        renderChatMessages(chatId, false, false);
+                    }
                 }
             }
         }

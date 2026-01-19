@@ -51,10 +51,36 @@ body {
   cursor: pointer;
   padding: 5px;
   transition: opacity 0.2s;
+  color: #8b98a7;
 }
 
 .settings-icon-btn:hover {
   opacity: 0.7;
+}
+
+/* Header Actions (Stats + Settings buttons) 🌿 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-header-btn {
+  background: none;
+  border: none;
+  color: #8b98a7;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-header-btn:hover {
+  background-color: rgba(82, 136, 193, 0.15);
+  color: #5288c1;
 }
 
 /* Search Bar з календарем 🌿 */
@@ -369,6 +395,11 @@ body {
   animation: fadeInMessage 0.2s ease-out;
 }
 
+/* 🌿 Ensure Overlay is positioned relative to this panel */
+.messages-panel {
+  position: relative !important;
+}
+
 @keyframes fadeInMessage {
   from {
     opacity: 0;
@@ -404,9 +435,19 @@ body {
 }
 
 .bubble-content {
-  max-width: 65%;
-  padding: 8px 12px;
+  min-width: 100px;
+  max-width: 75%;
+  /* Default mobile-friendly */
+  padding: 10px 14px 20px 14px;
+  /* Space for time */
   position: relative;
+}
+
+@media (min-width: 768px) {
+  .bubble-content {
+    max-width: 40%;
+    /* Desktop Telegram style */
+  }
 }
 
 .message-text {
@@ -414,6 +455,65 @@ body {
   font-size: 14px;
   line-height: 1.5;
   word-wrap: break-word;
+}
+
+/* 🌿 Text formatting styles */
+.message-text strong {
+  font-weight: 600;
+}
+
+.message-text em {
+  font-style: italic;
+}
+
+.message-text del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.message-text .inline-code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  color: #a3be8c;
+}
+
+.message-text pre {
+  background: #0e1621;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.message-text pre code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.message-text .spoiler {
+  background: #8b98a7;
+  color: transparent;
+  border-radius: 4px;
+  padding: 0 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.message-text .spoiler.revealed {
+  background: transparent;
+  color: inherit;
+}
+
+.message-text .quote {
+  border-left: 3px solid #5288c1;
+  padding-left: 10px;
+  margin: 8px 0;
+  color: #8b98a7;
+  font-style: italic;
 }
 
 .message-media {
@@ -428,27 +528,194 @@ body {
   display: block;
 }
 
+/* 🌿 Skeleton / Loading State */
+.loading-media {
+  min-height: 200px;
+  background: rgba(82, 136, 193, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.loading-media::after {
+  content: " ";
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid #5288c1;
+  border-color: #5288c1 transparent #5288c1 transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 🌿 Telegram/WhatsApp style message layout */
+.message-meta {
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 10;
+  /* Ensure time is readable on any background */
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* 🌿 Enhanced visibility for time on media */
+.message-media~.message-meta,
+.message-media+.message-meta {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  bottom: 6px;
+  right: 6px;
+  color: #fff;
+}
+
+.message-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: auto;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
 
 .message-media img,
 .message-media video {
   max-width: 100%;
   border-radius: 8px;
   margin-top: 5px;
+  filter: none !important;
+  /* Force remove blur */
 }
 
-.message-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
-  color: #8b98a7;
+/* 🌿 Telegram-style: reactions LEFT, time RIGHT */
+.bubble-content {
+  min-width: 120px;
+  max-width: 440px;
+  padding: 8px 12px 20px 12px;
+  /* Increased bottom padding to prevent time overlap */
+  position: relative;
 }
 
+/* Response handling for very wide screens */
+@media (min-width: 1600px) {
+  .bubble-content {
+    max-width: 35%;
+  }
+}
+
+/* Remove duplicated meta rule, consolidated above */
+/* .message-meta { ... } */
+
+/* Allow clicking on checks/time if needed? usually no */
 .message-time {
   font-size: 11px;
-  color: #8b98a7;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* Reactions: Flow normally in document flow, but ensure they don't cover time */
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  /* Space for time row */
+  max-width: 100%;
+}
+
+/* Bot specific overrides */
+.message-bubble.bot .bubble-content {
+  background-color: #2b5278;
+  /* Telegram Blue */
+  color: #fff;
+  border-radius: 12px 12px 2px 12px;
+}
+
+.message-bubble.client .bubble-content {
+  background-color: #182533;
+  /* Dark Gray */
+  border-radius: 12px 12px 12px 2px;
+}
+
+/* Adjust checks color for blue bubbles */
+.message-bubble.bot .read-status {
+  color: #64b5f6;
+  /* Lighter blue for checks */
+}
+
+.message-bubble.bot .message-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.reactions-row {
+  /* Deprecated in favor of .message-reactions if structure changed? USE both for safety */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  background: rgba(82, 136, 193, 0.15);
+  border: 1px solid rgba(82, 136, 193, 0.3);
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reaction-chip:hover {
+  background: rgba(82, 136, 193, 0.25);
+  transform: scale(1.05);
+}
+
+.reaction-count {
+  font-size: 11px;
+  color: #5288c1;
+  font-weight: 500;
+}
+
+/* Legacy footer (for compatibility) */
+.message-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  border-radius: 10px;
+  float: right;
+  clear: both;
+  font-size: 11px;
+  color: rgba(139, 152, 167, 0.8);
+  transition: background 0.15s ease;
+}
+
+.message-footer:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .message-reactions {
@@ -655,7 +922,91 @@ body {
   max-height: 180px;
 }
 
-/* Audio/Voice Player */
+/* 🌿 Telegram-style Voice Player */
+.voice-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+  min-width: 220px;
+  max-width: 300px;
+}
+
+.voice-play-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5288c1 0%, #3d6a9e 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(82, 136, 193, 0.3);
+}
+
+.voice-play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(82, 136, 193, 0.4);
+}
+
+.voice-play-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: white;
+}
+
+.voice-play-btn .play-icon {
+  margin-left: 2px;
+  /* Optical centering */
+}
+
+.voice-play-btn.playing .play-icon {
+  display: none;
+}
+
+.voice-play-btn.playing .pause-icon {
+  display: block;
+}
+
+.voice-waveform {
+  flex: 1;
+  height: 30px;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.waveform-svg {
+  width: 100%;
+  height: 100%;
+  color: #5288c1;
+}
+
+.voice-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(82, 136, 193, 0.6) 0%, rgba(82, 136, 193, 0.3) 100%);
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+
+.voice-duration {
+  font-size: 11px;
+  color: #8b98a7;
+  font-variant-numeric: tabular-nums;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* Legacy audio-player (kept for compatibility) */
 .audio-player {
   position: relative;
   width: 200px;
@@ -1134,164 +1485,201 @@ body {
 .task-item::before {
   content: '▫️';
 }
+
 /* Transparent Stickers */
 .message-bubble.sticker-only {
-    background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    max-width: 256px !important; /* Limit sticker size */
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+  width: 100%;
 }
 
-.message-bubble.sticker-only .message-sticker, 
+.message-bubble.sticker-only .bubble-content {
+  max-width: none !important;
+  width: fit-content;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Floating Footer for Stickers 🌿 */
+.message-bubble.sticker-only .message-footer {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin: 0;
+  z-index: 10;
+}
+
+.message-bubble.sticker-only .message-time {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.message-bubble.sticker-only .message-sticker,
 .message-bubble.sticker-only .message-animation {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .message-bubble.sticker-only img.sticker,
 .message-bubble.sticker-only video.sticker,
 .message-bubble.sticker-only video.animation,
 .message-bubble.sticker-only tgs-player {
-    border-radius: 0 !important;
-    display: block;
-    max-width: 100%;
+  border-radius: 0 !important;
+  display: block;
+  max-width: 100%;
 }
 
 .message-bubble.sticker-only .message-footer {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 2px 6px;
-    border-radius: 10px;
-    color: white;
-    font-size: 10px;
-    pointer-events: none;
-    backdrop-filter: blur(2px);
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: white;
+  font-size: 10px;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
 }
+
 /* Ensure reactions are visible below sticker if any */
 .message-bubble.sticker-only .message-reactions {
-    margin-top: 5px;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 16px;
-    padding: 2px 6px;
-    display: inline-flex;
-    backdrop-filter: blur(4px);
+  margin-top: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  padding: 2px 6px;
+  display: inline-flex;
+  backdrop-filter: blur(4px);
 }
 
 /* Header Avatar Style */
 .chat-header .chat-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-header #activeChatAvatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: #2b5278;
-    color: white;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    overflow: hidden;
-    flex-shrink: 0;
-    margin-right: -5px; /* Adjust gap */
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #2b5278;
+  color: white;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-right: -5px;
+  /* Adjust gap */
 }
 
 /* Ensure images fill the avatar container */
 .chat-header #activeChatAvatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 
 /* Fix Reactions visibility on Stickers */
 .message-bubble.sticker-only .message-reactions {
-    margin-top: 5px !important;
-    background: rgba(23, 33, 43, 0.8) !important; /* Dark background */
-    border-radius: 12px;
-    padding: 4px 8px !important;
-    display: inline-flex !important;
-    flex-wrap: wrap;
-    gap: 4px;
-    position: relative;
-    z-index: 10;
-    pointer-events: auto;
-    max-width: 100%;
+  margin-top: 5px !important;
+  background: rgba(23, 33, 43, 0.8) !important;
+  /* Dark background */
+  border-radius: 12px;
+  padding: 4px 8px !important;
+  display: inline-flex !important;
+  flex-wrap: wrap;
+  gap: 4px;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
+  max-width: 100%;
 }
 
 .message-bubble.sticker-only .reaction-chip {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
 }
 
 /* Ensure sticker bubble content allows overflow for reactions */
 .message-bubble.sticker-only .bubble-content {
-    overflow: visible !important;
+  overflow: visible !important;
 }
 
 /* Fix Mobile Layout Issues (Bottom overlap) */
 @media (max-width: 768px) {
-    .chat-input-panel {
-        padding-bottom: env(safe-area-inset-bottom, 10px);
-    }
-    
-    /* Ensure chat list doesn't get covered by bottom bars */
-    .chat-list-panel {
-        padding-bottom: 60px; 
-    }
+  .chat-input-panel {
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+  }
+
+  /* Ensure chat list doesn't get covered by bottom bars */
+  .chat-list-panel {
+    padding-bottom: 60px;
+  }
 }
 
 
 /* Ultra-Visibility for Sticker Reactions */
 .message-bubble.sticker-only .message-reactions {
-    margin-top: 4px !important;
-    background: transparent !important; /* Let chips stand out */
-    padding: 2px !important;
-    position: relative;
-    z-index: 200 !important; /* Above everything */
-    pointer-events: auto !important;
-    display: flex !important;
-    flex-wrap: wrap;
-    justify-content: flex-start; /* Align left usually, or center? */
+  margin-top: 4px !important;
+  background: transparent !important;
+  /* Let chips stand out */
+  padding: 2px !important;
+  position: relative;
+  z-index: 200 !important;
+  /* Above everything */
+  pointer-events: auto !important;
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  /* Align left usually, or center? */
 }
 
 .message-bubble.sticker-only .reaction-chip {
-    background-color: rgba(30, 40, 55, 0.85) !important; /* Solid dark background */
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    color: #ffffff !important;
-    font-size: 18px !important; /* Make emoji clearly visible */
-    line-height: 1.2 !important;
-    padding: 4px 10px !important;
-    border-radius: 20px !important;
-    height: auto !important;
-    min-height: 28px !important;
-    display: inline-flex !important;
-    align-items: center;
-    gap: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important;
-    cursor: pointer !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    text-shadow: none !important; /* Remove shadows that might blur emoji */
+  background-color: rgba(30, 40, 55, 0.85) !important;
+  /* Solid dark background */
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  font-size: 18px !important;
+  /* Make emoji clearly visible */
+  line-height: 1.2 !important;
+  padding: 4px 10px !important;
+  border-radius: 20px !important;
+  height: auto !important;
+  min-height: 28px !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5) !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  text-shadow: none !important;
+  /* Remove shadows that might blur emoji */
 }
 
 /* Ensure font rendering for emoji */
-.reaction-chip, .reaction-chip span {
-    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif !important;
+.reaction-chip,
+.reaction-chip span {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif !important;
 }
 
 /* Fix overlay issues */
 .sticker-only .media-content {
-    z-index: 1;
+  z-index: 1;
 }
 
 
@@ -1299,62 +1687,63 @@ body {
 
 /* Container for reactions AND the add button */
 .message-bubble.sticker-only .message-reactions,
-.message-bubble.sticker-only + .add-reaction-btn, 
+.message-bubble.sticker-only+.add-reaction-btn,
 .message-bubble.sticker-only .add-reaction-btn {
-    position: relative;
-    z-index: 500 !important;
+  position: relative;
+  z-index: 500 !important;
 }
 
 /* Make the Add Reaction button visible and usable on stickers */
 .message-bubble.sticker-only .add-reaction-btn {
-    background: rgba(40, 50, 65, 0.9) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    margin-left: 6px;
-    opacity: 1 !important;
-    color: #fff !important;
-    font-size: 16px !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-    vertical-align: middle;
+  background: rgba(40, 50, 65, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 6px;
+  opacity: 1 !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  vertical-align: middle;
 }
 
 /* Ensure the reaction chip itself is perfectly visible */
 .message-bubble.sticker-only .reaction-chip {
-    background-color: rgba(33, 150, 243, 0.2) !important; /* Slight blue tint */
-    border: 1px solid rgba(100, 181, 246, 0.5) !important;
-    color: #ffffff !important;
-    min-width: 30px;
-    height: 28px;
-    padding: 0 8px !important;
-    border-radius: 14px !important;
-    font-size: 18px !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    margin-right: 4px;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  background-color: rgba(33, 150, 243, 0.2) !important;
+  /* Slight blue tint */
+  border: 1px solid rgba(100, 181, 246, 0.5) !important;
+  color: #ffffff !important;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px !important;
+  border-radius: 14px !important;
+  font-size: 18px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Force colorful emojis by resetting color (supports some browsers) */
 /* .reaction-chip span { color: initial !important; } */
 
 /* Ensure the wrapper does not clip */
-.message-bubble.sticker-only, 
+.message-bubble.sticker-only,
 .message-bubble.sticker-only .bubble-content {
-    overflow: visible !important;
+  overflow: visible !important;
 }
 
 /* Fix z-index for the whole sticker bubble so it allows popups */
 .message-bubble.sticker-only {
-    z-index: auto;
+  z-index: auto;
 }
 
 
@@ -1363,12 +1752,137 @@ body {
 .message-bubble.client .message-footer,
 .message-bubble.me .add-reaction-btn,
 .message-bubble.client .add-reaction-btn {
-    pointer-events: auto !important;
+  pointer-events: auto !important;
+}
+
+/* 🌿 Unified Sticker Meta (One Pill) */
+.message-bubble.sticker-only .message-meta {
+  background: rgba(20, 20, 20, 0.6) !important;
+  border-radius: 16px !important;
+  padding: 4px 10px !important;
+  backdrop-filter: blur(6px);
+  margin-top: -35px;
+  /* Overlap the sticker bottom */
+  position: relative;
+  z-index: 10;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-end;
+  /* Align right */
+  float: right;
+  margin-right: 10px;
+  margin-bottom: 5px;
+}
+
+.message-bubble.sticker-only .reaction-chip {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: auto !important;
+  min-width: auto !important;
+}
+
+/* 🌿 Hide unwanted widgets on mobile chat list */
+@media (max-width: 768px) {
+
+  .chat-list-panel .widget,
+  .chat-list-panel .footer,
+  .chat-list-panel>div[style*="fixed"] {
+    display: none !important;
+  }
+}
+
+/* 🌿 Settings Modal Specifics (Override Stats CSS) */
+.settings-modal-content {
+  max-width: 400px !important;
+  width: 90% !important;
+  padding: 25px !important;
+  background: rgba(23, 33, 43, 0.98) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.settings-modal-content .modal-header h2 {
+  font-size: 1.4rem !important;
+}
+
+/* 🌿 Chat Loading Overlay for Smooth Switching */
+#chat-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(14, 22, 33, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
+  pointer-events: none;
+}
+
+#chat-loading-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.chat-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(82, 136, 193, 0.2);
+  border-top-color: #5288c1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+
+/* 🌿 SVG Add Button Styles */
+.replace-emoji-svg {
+  width: 16px;
+  height: 16px;
+  stroke: rgba(255, 255, 255, 0.5);
+  transition: stroke 0.2s, transform 0.2s;
+  vertical-align: middle;
+}
+
+.add-reaction-btn:hover .replace-emoji-svg {
+  stroke: #fff;
+  transform: scale(1.1);
+}
+
+/* 🌿 Better Sticker/Media Meta Composition */
+.message-bubble.sticker-only .message-meta,
+.message-bubble.message-media .message-meta {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  padding: 2px 8px !important;
+  margin-top: -30px;
+  /* Overlap */
+  position: relative;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  float: right;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-bubble.message-media .message-meta {
+  margin-top: -34px;
+  margin-right: 6px;
+  margin-bottom: 6px;
 }
 
 /* Ensure reaction chips are also clickable */
 .message-bubble.me .reaction-chip,
 .message-bubble.client .reaction-chip {
-    pointer-events: auto !important;
+  pointer-events: auto !important;
 }
-
