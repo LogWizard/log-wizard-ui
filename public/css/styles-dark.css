@@ -1908,18 +1908,22 @@ body {
   background: transparent !important;
   /* Ensure no bubble bg visible */
   box-shadow: none !important;
+  overflow: visible !important;
+  /* Allow reactions to flow outside */
 }
 
 .message-bubble.sticker-only .message-meta {
   opacity: 0;
   transition: opacity 0.25s ease-in-out;
-  bottom: 2px;
-  /* Tight corner */
-  right: 2px;
-  background: rgba(0, 0, 0, 0.45);
+  bottom: 0px;
+  /* Absolute flush */
+  right: 0px;
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   padding: 1px 5px;
-  border-radius: 6px;
+  border-radius: 6px 0 6px 0;
+  z-index: 50;
+  margin: 0 !important;
 }
 
 /* Show on hover */
@@ -1929,12 +1933,9 @@ body {
 
 /* Reactions adjustment for sticker mode */
 .message-bubble.sticker-only .message-reactions {
-  margin: 4px 0 2px 4px;
-  position: absolute;
-  /* Float reactions too? Or let them flow? */
-  /* If we float, they cover sticker. If flow, they expand container. */
-  /* Better to let them flow but ensure container allows it. */
-  /* If padding is 0, they flow below sticker. */
-  position: static;
+  margin: -4px 0 0 0;
+  /* Pull up slightly */
+  position: relative;
+  z-index: 40;
   padding: 4px;
 }
