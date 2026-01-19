@@ -458,10 +458,21 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
     if (isNewChat || shouldMsgScrollBottom || wasAtBottom) {
         container.scrollTop = container.scrollHeight;
 
-        // 🌿 Backup Scroll: Ensure we hit bottom after layout stabilizes (short delay)
-        setTimeout(() => {
-            if (container) container.scrollTop = container.scrollHeight;
-        }, 150);
+        // 🌿 Robust Sticky Scroll (New Chat): Force bottom for 1000ms
+        // This handles late headers, lazy images, and layout reflows without locking user too long.
+        if (isNewChat) {
+            const start = Date.now();
+            const loop = () => {
+                if (container) container.scrollTop = container.scrollHeight;
+                if (Date.now() - start < 1000) requestAnimationFrame(loop);
+            };
+            requestAnimationFrame(loop);
+        } else {
+            // Standard backup for new messages
+            setTimeout(() => {
+                if (container) container.scrollTop = container.scrollHeight;
+            }, 150);
+        }
 
         // 🌿 Smart Image Scroll: Only scroll if user is STILL near bottom
         // This prevents "jumping" if user starts scrolling up while images load
