@@ -532,42 +532,103 @@ export async function createMessageServer() {
         }
     });
 
-    // 🌿 Avatar Image Proxy (Cache Telegram Profile Photos)
+    // 🌿 Avatar Image Proxy with Physical Caching
     app.get('/api/avatar-image/:userId', async (req, res) => {
         try {
             const { userId } = req.params;
-            const pool = getPool();
+            const avatarPath = path.join(appDirectory, 'public', 'avatars', `${userId}.jpg`);
 
-            console.log(`🖼️ Avatar request for user ${userId}`);
-
-            // Get photo_url from database
-            if (pool) {
-                const [rows] = await pool.query(`SELECT photo_url FROM users WHERE id = ? LIMIT 1`, [userId]);
-                console.log(`📊 DB result for user ${userId}:`, rows);
-
-                if (rows && rows.length > 0 && rows[0].photo_url && rows[0].photo_url !== 'none') {
-                    const photoUrl = rows[0].photo_url;
-                    console.log(`✅ Found avatar URL: ${photoUrl}`);
-
-                    // Proxy the Telegram image
-                    const imageResp = await fetch(photoUrl);
-                    if (!imageResp.ok) throw new Error('Failed to fetch avatar from Telegram');
-
-                    const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
-                    res.setHeader('Content-Type', contentType);
-                    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h cache
-
-                    const buffer = await imageResp.arrayBuffer();
-                    return res.send(Buffer.from(buffer));
-                } else {
-                    console.log(`❌ No avatar in DB for user ${userId}`);
-                }
+            // 1. Check if cached file exists
+            if (fs.existsSync(avatarPath)) {
+                console.log(`✅ Serving cached avatar for user ${userId}`);
+                return res.sendFile(avatarPath);
             }
 
-            // Fallback: return 404 if no avatar
+            const pool = getPool();
+            if (!pool) return res.status(404).send();
+
+            // 2. Check cooldown for users without avatars
+            const [userRows] = await pool.query(`
+                SELECT avatar_cached, last_avatar_check, photo_url 
+                FROM users WHERE id = ? LIMIT 1
+            `, [userId]);
+
+            if (userRows && userRows.length > 0) {
+                const user = userRows[0];
+                const now = Math.floor(Date.now() / 1000);
+                const COOLDOWN_DAYS = 7;
+                const cooldownPassed = (now - user.last_avatar_check) > (COOLDOWN_DAYS * 24 * 60 * 60);
+
+                // If checked recently and no avatar, skip TG API call
+                if (user.avatar_cached === 0 && !cooldownPassed) {
+                    console.log(`⏰ Cooldown active for user ${userId}, skipping TG API`);
+                    return res.status(404).send();
+                }
+
+                // 3. Fetch from Telegram API
+                console.log(`🔍 Fetching avatar from Telegram for user ${userId}`);
+
+                const paramsOnConfig = await configManager.read();
+                const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'];
+
+                if (!token) {
+                    console.error('❌ No Bot Token found!');
+                    return res.status(500).send();
+                }
+
+                // Try to use existing photo_url first
+                let photoUrl = user.photo_url;
+
+                // If no photo_url in DB, try getUserProfilePhotos
+                if (!photoUrl || photoUrl === 'none') {
+                    const photosResp = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+                    const photosData = await photosResp.json();
+
+                    if (!photosData.ok || photosData.result.total_count === 0) {
+                        // No avatar - update cooldown
+                        await pool.query(`
+                            UPDATE users SET avatar_cached = 0, last_avatar_check = ? WHERE id = ?
+                        `, [now, userId]);
+                        console.log(`❌ No avatar for user ${userId}, cooldown set`);
+                        return res.status(404).send();
+                    }
+
+                    // Get file_id of the largest photo
+                    const photos = photosData.result.photos[0];
+                    const largestPhoto = photos[photos.length - 1];
+                    const fileId = largestPhoto.file_id;
+
+                    // Get file path
+                    const fileResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+                    const fileData = await fileResp.json();
+
+                    if (!fileData.ok) throw new Error('Failed to get file path');
+
+                    photoUrl = `https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`;
+                }
+
+                // Download and save avatar
+                const avatarResp = await fetch(photoUrl);
+                if (!avatarResp.ok) throw new Error('Failed to download avatar');
+
+                const buffer = await avatarResp.arrayBuffer();
+                fs.writeFileSync(avatarPath, Buffer.from(buffer));
+
+                // Update DB
+                await pool.query(`
+                    UPDATE users SET avatar_cached = 1, last_avatar_check = ? WHERE id = ?
+                `, [now, userId]);
+
+                console.log(`✅ Avatar cached for user ${userId}`);
+
+                res.setHeader('Content-Type', 'image/jpeg');
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                return res.send(Buffer.from(buffer));
+            }
+
             res.status(404).send();
         } catch (error) {
-            console.error('Avatar Image Error:', error);
+            console.error('Avatar fetch error:', error);
             res.status(404).send();
         }
     });
