@@ -126,8 +126,39 @@ function setupEventListeners() {
         backBtn.addEventListener('click', () => {
             document.body.classList.remove('mobile-chat-active');
             setState('selectedChatId', null);
+            // 🌿 URL Fix: Clear query params
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.delete('chat_id');
+            window.history.pushState({}, '', newUrl);
         });
     }
+
+    // 🌿 Browser Back Button Support (History API)
+    window.addEventListener('popstate', (event) => {
+        const params = new URLSearchParams(window.location.search);
+        const chatId = params.get('chat_id');
+
+        if (chatId) {
+            // Restore chat
+            setState('selectedChatId', chatId);
+            window.selectedChatId = chatId;
+            // Trigger render (assuming chat data exists or will load)
+            if (typeof state.chatGroups[chatId] !== 'undefined') {
+                import('./modules/ui-renderer.js').then(m => {
+                    m.selectChat(chatId); // Re-select
+                });
+            } else {
+                // If not loaded, reload or let polling handle it.
+                // Better to set state and let polling/render catch it.
+                document.body.classList.add('mobile-chat-active');
+            }
+        } else {
+            // Back to list
+            document.body.classList.remove('mobile-chat-active');
+            setState('selectedChatId', null);
+            window.selectedChatId = null;
+        }
+    });
 
     // Views
     state.ui.chatViewBtn.addEventListener('click', () => switchView('chat'));
