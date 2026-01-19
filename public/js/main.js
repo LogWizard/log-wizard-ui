@@ -1,3 +1,12 @@
+// 🌿 Auto-clear stale localStorage on version change
+const APP_VERSION = '1.0.1'; // Bump this on breaking changes
+const storedVersion = localStorage.getItem('app_version');
+if (storedVersion !== APP_VERSION) {
+    console.log(`🔄 App updated (${storedVersion} → ${APP_VERSION}), clearing localStorage...`);
+    localStorage.clear();
+    localStorage.setItem('app_version', APP_VERSION);
+}
+
 import { state, setState, loadState, saveState } from './modules/state.js';
 import { fetchMessages, loadPreviousDateMessages, setSettingsToServer } from './modules/api.js';
 import { renderChatListView, renderChatMessages, renderTimelineView, showEmptyMessagesState } from './modules/ui-renderer.js';
