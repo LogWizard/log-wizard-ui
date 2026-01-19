@@ -514,6 +514,10 @@ export async function setReaction(req, res) {
 
                     fs.writeFileSync(filePath, JSON.stringify(content, null, 2));
                     console.log(`Reaction saved locally to ${filePath}`);
+
+                    // 🌿 Update DB with new reaction data
+                    await logToDB(content);
+
                     fileUpdated = true;
                     break;
                 }
