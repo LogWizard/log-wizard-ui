@@ -934,7 +934,8 @@ function createMessageBubble(msg, type) {
 
         // 🌿 Backend-Provided Avatar (Fast!)
         let avatarImg = userInitials;
-        if (msg.from?.photo_url && msg.from.photo_url !== 'none' && userId) {
+        if (msg.from?.photo_url && msg.from.photo_url !== 'none') {
+            // Will try to load, onerror shows initials if fails
             avatarImg = `<img src="${msg.from.photo_url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerText = '${userInitials}';">`;
         }
 
