@@ -18,7 +18,7 @@ const appRoot = path.resolve(__dirname, '..'); // root
 
 // Hardcoded path to messages folder
 // Adjust this if your 'messages' folder is elsewhere
-const MESSAGES_ROOT = path.join(appRoot, 'messages');
+const MESSAGES_ROOT = path.resolve(appRoot, '../ks_gys_bot/messages');
 
 async function migrate() {
     console.log('🦆 Starting Migration Duck...');
