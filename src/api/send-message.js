@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import FormData from 'form-data'; // 🌿 Added for local file uploads
 import { convertVideoToNote, convertAudioToVoice } from '../services/video-processor.js'; // 🌿 Video/Audio service
+import { getPool } from '../services/db.js'; // 🌿 DB Access
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,22 +125,8 @@ export async function sendMessage(req, res) {
 
         saveMessageLocally(data, 'Message');
 
-        // 🌿 CRITICAL FIX: Save to DB immediately (bot will sync later anyway)
-        try {
-            const { getPool } = await import('../services/db.js');
-            const pool = getPool();
-            if (pool) {
-                const msg = data.result;
-                await pool.query(`
-                    INSERT INTO messages (message_id, chat_id, from_id, date, text, type, raw_data)
-                    VALUES (?, ?, ?, ?, ?, 'text', ?)
-                    ON DUPLICATE KEY UPDATE text = VALUES(text), raw_data = VALUES(raw_data)
-                `, [msg.message_id, msg.chat.id, msg.from.id, msg.date, text, JSON.stringify(msg)]);
-                console.log(`✅ Message ${msg.message_id} saved to DB`);
-            }
-        } catch (dbErr) {
-            console.error('DB save error (non-critical):', dbErr);
-        }
+        // 🌿 Save to DB (Unified)
+        await logToDB(data.result);
 
         res.json({ success: true, message: data.result });
     } catch (error) {
@@ -173,6 +160,7 @@ export async function sendPhoto(req, res) {
         }
 
         saveMessageLocally(data, 'Photo');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending photo:', error);
@@ -205,6 +193,7 @@ export async function sendVideo(req, res) {
         }
 
         saveMessageLocally(data, 'Video');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending video:', error);
@@ -236,6 +225,7 @@ export async function sendAudio(req, res) {
         }
 
         saveMessageLocally(data, 'Audio');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending audio:', error);
@@ -266,6 +256,7 @@ export async function sendVoice(req, res) {
         }
 
         saveMessageLocally(data, 'Voice');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending voice:', error);
@@ -303,6 +294,7 @@ export async function sendSticker(req, res) {
         }
 
         saveMessageLocally(data, 'Sticker');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending sticker:', error);
@@ -363,6 +355,7 @@ export async function sendVideoNote(req, res) {
         }
 
         saveMessageLocally(data, 'VideoNote');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
 
     } catch (error) {
@@ -420,6 +413,7 @@ export async function sendVoiceNote(req, res) {
         }
 
         saveMessageLocally(data, 'Voice');
+        await logToDB(data.result);
         res.json({ success: true, message: data.result });
 
     } catch (error) {
