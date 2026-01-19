@@ -123,6 +123,24 @@ export async function sendMessage(req, res) {
         }
 
         saveMessageLocally(data, 'Message');
+
+        // 🌿 CRITICAL FIX: Save to DB immediately (bot will sync later anyway)
+        try {
+            const { getPool } = await import('../services/db.js');
+            const pool = getPool();
+            if (pool) {
+                const msg = data.result;
+                await pool.query(`
+                    INSERT INTO messages (message_id, chat_id, from_id, date, text, type, raw_data)
+                    VALUES (?, ?, ?, ?, ?, 'text', ?)
+                    ON DUPLICATE KEY UPDATE text = VALUES(text), raw_data = VALUES(raw_data)
+                `, [msg.message_id, msg.chat.id, msg.from.id, msg.date, text, JSON.stringify(msg)]);
+                console.log(`✅ Message ${msg.message_id} saved to DB`);
+            }
+        } catch (dbErr) {
+            console.error('DB save error (non-critical):', dbErr);
+        }
+
         res.json({ success: true, message: data.result });
     } catch (error) {
         console.error('Error sending message:', error);
