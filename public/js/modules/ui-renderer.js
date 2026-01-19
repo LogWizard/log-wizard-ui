@@ -912,20 +912,16 @@ function createMessageBubble(msg, type) {
             const count = r.total_count || r.count || 1;
             const isOwn = r.is_own || false;
 
-            // 🌿 Minimalistic chips for stickers, standard for text
-            const chipStyle = isStickerOnly
-                ? 'background: none; border: none; padding: 2px 4px; margin: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));'
-                : 'padding: 4px 10px; border-radius: 16px; margin-right: 4px; ' + (isOwn
-                    ? 'background: rgba(59, 130, 246, 0.4); border: 1px solid rgba(100, 181, 246, 0.6); color: white;'
-                    : 'background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); color: #e0e0e0;');
+            // 🌿 Unified Reaction Styles (Standard pills for all types)
+            const chipStyle = 'padding: 4px 10px; border-radius: 16px; margin-right: 4px; backdrop-filter: blur(4px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); ' + (isOwn
+                ? 'background: rgba(59, 130, 246, 0.75); border: 1px solid rgba(100, 181, 246, 0.5); color: white;'
+                : 'background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); color: #e0e0e0;');
 
-            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}">${emoji}${count > 1 ? `<span class="reaction-count">${count}</span>` : ''}</span>`;
+            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}" style="${chipStyle}">${emoji}${count > 1 ? `<span class="reaction-count" style="margin-left:4px; font-size: 0.9em; opacity: 0.9;">${count}</span>` : ''}</span>`;
         }).join('');
 
-        // 🌿 Adjust container based on message type
-        const reactionsContainerStyle = isStickerOnly
-            ? 'display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;'
-            : 'margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 5;';
+        // 🌿 Consistent container for all types
+        const reactionsContainerStyle = 'margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 5; pointer-events: auto;';
 
         reactionsHtml = `<div class="message-reactions" style="${reactionsContainerStyle}">${reactionItems}</div>`;
     }
