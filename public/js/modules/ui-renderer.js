@@ -453,16 +453,34 @@ export function renderChatMessages(chatId, shouldMsgScrollBottom = true, forceCl
 
     sorted.forEach(msg => appendMessage(msg, container, lastDate, (d) => lastDate = d));
 
-    // 🌿 SCROLL LOGIC:
-    // - New chat: ALWAYS scroll to bottom
-    // - Updates on same chat: only if user was at bottom OR explicit request
+    // 🌿 SCROLL LOGIC (Robust for Images)
+    // - New chat: ALWAYS scroll to bottom and KEEP scrolling while images load
     if (isNewChat || shouldMsgScrollBottom || wasAtBottom) {
         container.scrollTop = container.scrollHeight;
+
+        // 🌿 Sticky Scroll: Keep forcing bottom for 1.5s to handle layout shifts (images)
+        const stickyDuration = 1500;
+        const stickyStart = Date.now();
+
+        const stickyInterval = setInterval(() => {
+            if (Date.now() - stickyStart > stickyDuration) {
+                clearInterval(stickyInterval);
+            } else {
+                container.scrollTop = container.scrollHeight;
+            }
+        }, 50); // Check every 50ms
+
+        // Also strictly on image load
+        const images = container.querySelectorAll('img');
+        images.forEach(img => {
+            img.onload = () => container.scrollTop = container.scrollHeight;
+        });
     }
 
     // 🌿 Hide Loading Overlay after render (if active)
     if (isNewChat) {
-        setTimeout(() => window.hideChatLoading(), 350); // Increased delay for stability
+        // slightly longer delay to ensure first paint is done
+        setTimeout(() => window.hideChatLoading(), 600);
     }
 
     injectPlugins();
