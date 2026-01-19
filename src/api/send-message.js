@@ -445,6 +445,7 @@ export async function setReaction(req, res) {
             is_big: is_big || false
         };
 
+        console.log('🔹 setReaction Payload:', JSON.stringify(payload)); // DEBUG
         const response = await fetch(`${TELEGRAM_API}/setMessageReaction`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -452,6 +453,7 @@ export async function setReaction(req, res) {
         });
 
         const data = await response.json();
+        console.log('🔹 TG Response:', JSON.stringify(data)); // DEBUG
 
         if (!data.ok) throw new Error(data.description);
 
