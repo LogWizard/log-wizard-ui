@@ -265,7 +265,12 @@ export async function createMessageServer() {
 
                 // 🌿 Enrich `from` with server-side user data (including photo_url)
                 if (!msg.from) msg.from = {};
-                msg.from.photo_url = row.from_photo_url || 'none';
+                // Use proxy endpoint if we have a photo_url in DB
+                if (row.from_photo_url && row.from_photo_url !== 'none') {
+                    msg.from.photo_url = `/api/avatar-image/${msg.from.id}`; // 🌿 Use our proxy
+                } else {
+                    msg.from.photo_url = 'none';
+                }
                 msg.from.first_name = msg.from.first_name || row.first_name;
                 msg.from.last_name = msg.from.last_name || row.last_name;
                 msg.from.username = msg.from.username || row.username;
@@ -510,6 +515,39 @@ export async function createMessageServer() {
         } catch (error) {
             console.error('Sticker Image Error:', error);
             res.status(500).send();
+        }
+    });
+
+    // 🌿 Avatar Image Proxy (Cache Telegram Profile Photos)
+    app.get('/api/avatar-image/:userId', async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const pool = getPool();
+
+            // Get photo_url from database
+            if (pool) {
+                const [rows] = await pool.query(`SELECT photo_url FROM users WHERE id = ? LIMIT 1`, [userId]);
+                if (rows && rows.length > 0 && rows[0].photo_url && rows[0].photo_url !== 'none') {
+                    const photoUrl = rows[0].photo_url;
+
+                    // Proxy the Telegram image
+                    const imageResp = await fetch(photoUrl);
+                    if (!imageResp.ok) throw new Error('Failed to fetch avatar from Telegram');
+
+                    const contentType = imageResp.headers.get('content-type') || 'image/jpeg';
+                    res.setHeader('Content-Type', contentType);
+                    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h cache
+
+                    const buffer = await imageResp.arrayBuffer();
+                    return res.send(Buffer.from(buffer));
+                }
+            }
+
+            // Fallback: return 404 if no avatar
+            res.status(404).send();
+        } catch (error) {
+            console.error('Avatar Image Error:', error);
+            res.status(404).send();
         }
     });
 

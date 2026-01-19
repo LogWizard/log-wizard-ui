@@ -976,6 +976,14 @@ function createMessageBubble(msg, type) {
         </div>
     `;
 
+    // 🌿 Right-Click Context Menu for Reactions
+    div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (window.showReactionPicker) {
+            window.showReactionPicker(e, msg.message_id, state.selectedChatId);
+        }
+    });
+
     return div;
 }
 
