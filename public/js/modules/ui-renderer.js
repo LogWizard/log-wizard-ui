@@ -928,6 +928,9 @@ function createMessageBubble(msg, type) {
         }));
     }
 
+    const msgId = msg.message_id;
+    const chatId = msg.chat?.id || msg.chat_id || window.selectedChatId;
+
     if (reactionsList && reactionsList.length > 0) {
         const reactionItems = reactionsList.map(r => {
             const emoji = r.type?.emoji || r.emoji || '❤️';
@@ -949,8 +952,6 @@ function createMessageBubble(msg, type) {
     }
 
     // Reaction button (add reaction) 🌿
-    const msgId = msg.message_id;
-    const chatId = msg.chat?.id || window.selectedChatId;
     const reactionBtn = `<span class="add-reaction-btn" data-msg-id="${msgId}" data-chat-id="${chatId}" style="cursor: pointer; opacity: 0; margin-left: 6px; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%;" title="Add Reaction">
         <svg class="replace-emoji-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"></line>
