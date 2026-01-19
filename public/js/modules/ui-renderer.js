@@ -960,16 +960,6 @@ function createMessageBubble(msg, type) {
         `;
     }
 
-    // 🌿 Telegram-style: reactions LEFT, time RIGHT (same row)
-    let metaReactionsHtml = '';
-    if (reactionsList && reactionsList.length > 0) {
-        metaReactionsHtml = reactionsList.map(r => {
-            const emoji = r.type?.emoji || r.emoji || '❤️';
-            const count = r.total_count || r.count || 1;
-            return `<span class="reaction-chip">${emoji}${count > 1 ? `<span class="reaction-count">${count}</span>` : ''}</span>`;
-        }).join('');
-    }
-
     div.innerHTML = `
         ${avatarHtml}
         <div class="bubble-content">
@@ -977,7 +967,7 @@ function createMessageBubble(msg, type) {
             ${mediaHtml}
             ${formattedText ? `<div class="message-text">${formattedText}</div>` : ''}
             
-            ${metaReactionsHtml ? `<div class="message-reactions">${metaReactionsHtml}</div>` : ''}
+            ${reactionsHtml || ''}
             
             <!-- 🌿 Absolute Time (No more reaction button!) -->
             <div class="message-meta">
