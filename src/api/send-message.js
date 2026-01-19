@@ -534,3 +534,70 @@ export async function setReaction(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
+
+/**
+ * 🌿 Unified DB Logger for Outgoing Messages
+ */
+async function logToDB(msg) {
+    try {
+        const pool = getPool();
+        if (!pool) return;
+
+        // 1. Update Chat Timestamp (Important for sorting!)
+        await pool.query(`
+            UPDATE chats SET last_updated = NOW() WHERE id = ?
+        `, [msg.chat.id]);
+
+        // 2. Insert Message
+        let type = 'text';
+        let mediaUrl = null;
+        let text = msg.text || msg.caption || null;
+
+        if (msg.sticker) {
+            type = 'sticker';
+            // Prefer enriched URL if available, else file_id
+            mediaUrl = msg.url_sticker || msg.sticker.file_id;
+        } else if (msg.photo) {
+            type = 'photo';
+            mediaUrl = msg.url_photo || (Array.isArray(msg.photo) ? msg.photo[0].file_id : null);
+        } else if (msg.video) {
+            type = 'video';
+            mediaUrl = msg.url_video || msg.video.file_id;
+        } else if (msg.voice) {
+            type = 'voice';
+            mediaUrl = msg.url_voice || msg.voice.file_id;
+        } else if (msg.audio) {
+            type = 'audio';
+            mediaUrl = msg.url_audio || msg.audio.file_id;
+        } else if (msg.video_note) {
+            type = 'video_note';
+            mediaUrl = msg.url_video_note || msg.video_note.file_id;
+        } else if (msg.animation) {
+            type = 'animation';
+            mediaUrl = msg.url_animation || msg.animation.file_id;
+        }
+
+        await pool.query(`
+            INSERT INTO messages (message_id, chat_id, from_id, date, text, caption, type, media_url, raw_data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                text = VALUES(text),
+                caption = VALUES(caption),
+                media_url = VALUES(media_url),
+                raw_data = VALUES(raw_data)
+        `, [
+            msg.message_id,
+            msg.chat.id,
+            msg.from.id,
+            new Date(msg.date * 1000),
+            text,
+            msg.caption || null,
+            type,
+            mediaUrl,
+            JSON.stringify(msg)
+        ]);
+        // console.log(`✅ Logged ${type} ${msg.message_id} to DB`);
+    } catch (e) {
+        console.error('DB Log Error:', e);
+    }
+}
