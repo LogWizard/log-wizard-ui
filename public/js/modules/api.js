@@ -58,6 +58,8 @@ export async function fetchMessages() {
                     chats.forEach(c => {
                         if (groups[c.id]) {
                             groups[c.id].name = c.name || groups[c.id].name;
+                            groups[c.id].photo = c.photo; // 🌿 Update photo
+
                             if (c.lastMessage && (!groups[c.id].lastMessage || safeParseDate(c.lastMessage.time) > safeParseDate(groups[c.id].lastMessage.time))) {
                                 groups[c.id].lastMessage = c.lastMessage;
                             }
@@ -68,6 +70,7 @@ export async function fetchMessages() {
                                 messages: [],
                                 lastDate: c.lastDate || null,
                                 lastMessage: c.lastMessage || { time: null, text: 'History' },
+                                photo: c.photo, // 🌿 Save photo
                                 avatar: null
                             };
                         }
