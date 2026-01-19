@@ -130,6 +130,17 @@ export async function createMessageServer() {
     });
     /* Api Settings */
 
+    // 🌿 Message Sending APIs
+    app.post('/api/send-message', sendMessage);
+    app.post('/api/send-photo', sendPhoto);
+    app.post('/api/send-video', sendVideo);
+    app.post('/api/send-audio', sendAudio);
+    app.post('/api/send-voice', sendVoice);
+    app.post('/api/send-sticker', sendSticker);
+    app.post('/api/send-video-note', sendVideoNote);
+    app.post('/api/send-voice-note', sendVoiceNote);
+    app.post('/api/set-reaction', setReaction);
+
     /* Цей роутер відповідає за get запитів /message */
     app.get('/messages', async (req, res) => {
         const pool = getPool();
