@@ -385,6 +385,25 @@ export async function selectChat(chatId) {
         // Manual State Logic
         if (typeof loadManualModeState === 'function') loadManualModeState(chatId);
 
+        // 🌿 Restore Draft
+        const savedDraft = localStorage.getItem(`draft_${chatId}`);
+        const input = document.getElementById('messageInput');
+
+        if (savedDraft) {
+            if (window.quill) {
+                // Determine if it's HTML or plain text (legacy drafts might be plain)
+                // Quill handles HTML usually.
+                window.quill.root.innerHTML = savedDraft;
+            }
+            if (input) input.value = savedDraft; // Sync legacy input
+        } else {
+            // Clear input if no draft
+            if (window.quill && window.quill.root.innerHTML !== '<p><br></p>') {
+                window.quill.root.innerHTML = '<p><br></p>';
+            }
+            if (input) input.value = '';
+        }
+
         // Update UI active class
         const list = state.ui.chatList;
         if (list) {
@@ -686,13 +705,13 @@ function createMessageBubble(msg, type) {
     // Force alignment style for bot messages to override any CSS conflicts 🌿
     const alignmentStyle = type === 'bot' ? 'justify-content: flex-end;' : 'justify-content: flex-start;';
 
-    // DEBUG: Check reactions on stickers (Deep Dive)
-    if (isStickerOnly) {
-        console.groupCollapsed(`🖼️ Sticker Msg ${msg.message_id} Debug`);
-        console.log('Full Message Object:', msg);
-        console.log('Reactions field:', msg.reactions);
-        console.log('Raw Data field:', msg.raw_data);
-        console.groupEnd();
+
+
+    // 🕵️‍♂️ GHOST BUSTER: OKAK TRAP 🌿
+    if ((msg.text && msg.text.includes('OKAK')) || (msg.caption && msg.caption.includes('OKAK'))) {
+        console.error('👻 GHOST FOUND: "OKAK" detected in message!', msg);
+        // Highlight it visibly in UI
+        div.style.border = '2px solid red';
     }
 
     div.className = `message-bubble ${type} ${isStickerOnly ? 'sticker-only' : ''}`;
@@ -921,7 +940,7 @@ function createMessageBubble(msg, type) {
     const msgId = msg.message_id;
     const chatId = msg.chat?.id || msg.chat_id || window.selectedChatId;
 
-    if (isStickerOnly) console.log(`Sticker Msg ${msgId} Debug: reactions=`, reactionsList); // DEBUG 🌿
+
 
     // Handle object format { "👍": 1 } or specific Bot API structures
     if (!Array.isArray(reactionsList) && typeof rawReactions === 'object' && Object.keys(rawReactions).length > 0) {
@@ -933,23 +952,26 @@ function createMessageBubble(msg, type) {
     }
 
     if (reactionsList && reactionsList.length > 0) {
-        const reactionItems = reactionsList.map(r => {
+        // 🌿 Filter out reactions with 0 count unless they are 'own' (pending update)
+        const visibleReactions = reactionsList.filter(r => (r.total_count || r.count || 0) > 0 || r.is_own);
+
+        const reactionItems = visibleReactions.map(r => {
             const emoji = r.type?.emoji || r.emoji || '❤️';
             const count = r.total_count || r.count || 1;
-            const isOwn = r.is_own === true || r.is_own === 1 || false; // Robust check
+            const isOwn = r.is_own === true || r.is_own === 1 || String(r.is_own) === 'true'; // Robust check ✨
 
             // 🌿 Unified Reaction Styles (Standard pills for all types)
             const chipStyle = 'padding: 4px 10px; border-radius: 16px; margin-right: 4px; backdrop-filter: blur(4px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); ' + (isOwn
                 ? 'background: rgba(59, 130, 246, 0.75); border: 1px solid rgba(100, 181, 246, 0.5); color: white;'
-                : 'background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); color: #e0e0e0;');
+                : 'background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); color: #e0e0e0; pointer-events: none; opacity: 0.8;');
 
-            return `<span class="reaction-chip ${isOwn ? 'own' : ''}" data-emoji="${emoji}" style="${chipStyle} cursor: pointer;" onclick="event.stopPropagation(); window.handleReaction('${chatId}', '${msgId}', '${emoji}')">${emoji}${count > 1 ? `<span class="reaction-count" style="margin-left:4px; font-size: 0.9em; opacity: 0.9;">${count}</span>` : ''}</span>`;
+            return `<span class="reaction-chip ${isOwn ? 'own' : 'inert'}" data-emoji="${emoji}" style="${chipStyle} ${isOwn ? 'cursor: pointer;' : 'cursor: default;'}" ${isOwn ? `onclick="event.stopPropagation(); window.handleReaction('${chatId}', '${msgId}', '${emoji}')"` : ''}>${emoji}${count > 1 ? `<span class="reaction-count" style="margin-left:4px; font-size: 0.9em; opacity: 0.9;">${count}</span>` : ''}</span>`;
         }).join('');
 
-        // 🌿 Consistent container for all types
-        const reactionsContainerStyle = 'margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 5; pointer-events: auto;';
-
-        reactionsHtml = `<div class="message-reactions" style="${reactionsContainerStyle}">${reactionItems}</div>`;
+        if (reactionItems) {
+            const reactionsContainerStyle = 'margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; position: relative; z-index: 5; pointer-events: auto;';
+            reactionsHtml = `<div class="message-reactions" style="${reactionsContainerStyle}">${reactionItems}</div>`;
+        }
     }
 
     // Reaction button (add reaction) 🌿
@@ -996,6 +1018,31 @@ function createMessageBubble(msg, type) {
             ${isStickerOnly ? '' : senderNameHtm}
             ${mediaHtml}
             ${formattedText ? `<div class="message-text">${formattedText}</div>` : ''}
+
+            ${(() => {
+            // 🌿 Edit History Rendering
+            if (msg.edit_history && Array.isArray(msg.edit_history) && msg.edit_history.length > 0) {
+                const editsList = msg.edit_history.map((edit, idx) => {
+                    const editTime = safeParseDate(edit.date).toLocaleString('uk-UA');
+                    let text = formatMessageText(edit.text || edit.caption || '<i>[Media Only]</i>');
+                    if (window.emojione) text = window.emojione.toImage(text);
+                    return `
+                            <div class="edit-item" style="margin-bottom:8px; padding:4px; background:rgba(0,0,0,0.2); border-radius:4px;">
+                                <div style="font-size:11px; color:#64b5f6; margin-bottom:2px;">v${idx + 1} • ${editTime}</div>
+                                <div style="font-size:13px;">${text}</div>
+                            </div>`;
+                }).join('');
+
+                return `
+                        <div class="edit-history-container" style="margin-top: 6px;">
+                            <div class="edit-history-toggle" onclick="const c=this.nextElementSibling; c.style.display=c.style.display==='none'?'block':'none'; this.innerText = c.style.display==='none' ? '✏️ Edited (${msg.edit_history.length})' : '🔼 Hide History'" style="font-size:11px; color:#888; cursor:pointer; user-select:none;">✏️ Edited (${msg.edit_history.length})</div>
+                            <div class="edit-history-content" style="display:none; margin-top:6px; border-left: 2px solid #64b5f6; padding-left: 8px;">
+                                ${editsList}
+                            </div>
+                        </div>`;
+            }
+            return '';
+        })()}
             
             ${reactionsHtml || ''}
             
@@ -1008,9 +1055,12 @@ function createMessageBubble(msg, type) {
 
     // 🌿 Right-Click Context Menu for Reactions
     div.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
+        console.log(`🖱️ Context Menu requested for Msg ID: ${msg.message_id} in Chat: ${chatId}`);
         if (window.showReactionPicker) {
-            window.showReactionPicker(e, msg.message_id, state.selectedChatId);
+            e.preventDefault(); // Moved here to ensure we only block if we handle it
+            window.showReactionPicker(chatId, msg.message_id, e);
+        } else {
+            console.warn('⚠️ window.showReactionPicker is missing!');
         }
     });
 
@@ -1072,68 +1122,271 @@ window.handleManualModeToggle = function (e) {
 };
 
 // 💬 Reaction Picker Logic 🌿
-window.showReactionPicker = function (e, msgId, chatId) {
-    // Remove existing
-    document.querySelectorAll('.reaction-picker').forEach(p => p.remove());
+// 🌿 Show Context Menu (Reaction Picker)
+window.showReactionPicker = function (chatId, msgId, e) {
+    e.preventDefault();
+    e.stopPropagation();
 
-    const picker = document.createElement('div');
-    picker.className = 'reaction-picker';
-    picker.style.cssText = `
-        position: fixed;
-        background: linear-gradient(135deg, #1e2c3a 0%, #17212b 100%);
-        border: 1px solid #2b5278;
-        border-radius: 16px;
-        padding: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        max-width: 280px;
-        z-index: 10000;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-        animation: fadeIn 0.15s ease-out;
-    `;
+    // Close any existing
+    document.querySelectorAll('.context-menu').forEach(p => p.remove());
 
-    // Position near mouse
-    const x = Math.min(e.clientX, window.innerWidth - 300);
-    const y = Math.min(e.clientY, window.innerHeight - 200);
-    picker.style.left = `${x}px`;
-    picker.style.top = `${y}px`;
+    // 0. 🌿 Force Inject Styles (Failsafe)
+    if (!document.getElementById('context-menu-styles')) {
+        const style = document.createElement('style');
+        style.id = 'context-menu-styles';
+        style.textContent = `
+            .context-menu {
+                position: fixed;
+                background: #17212b;
+                border: 1px solid #2b5278;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                border-radius: 12px;
+                z-index: 99999;
+                padding: 8px;
+                width: 280px;
+                backdrop-filter: blur(10px);
+                animation: menuFadeIn 0.15s ease-out;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            @keyframes menuFadeIn {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            .context-menu-toolbar {
+                display: flex;
+                gap: 8px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid rgba(82, 136, 193, 0.2);
+                transition: all 0.2s ease-out;
+            }
+            /* Confirmation State Styling */
+            .context-menu-toolbar.confirming {
+                border-bottom-color: #e17076;
+            }
+            .context-action-btn {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 8px;
+                border-radius: 8px;
+                background: rgba(43, 82, 120, 0.3);
+                color: #e0e0e0;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .context-action-btn:hover {
+                background: #2b5278;
+                color: white;
+            }
+            .context-action-btn.delete:hover {
+                background: #e17076;
+            }
+            .context-action-btn.confirm-delete {
+                background: rgba(229, 57, 53, 0.2);
+                color: #e53935;
+            }
+            .context-action-btn.confirm-delete:hover {
+                background: #d32f2f;
+                color: white;
+            }
+            .context-action-btn.cancel-delete {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .context-action-btn.cancel-delete:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+            .emoji-grid {
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                gap: 4px;
+                max-height: 200px;
+                overflow-y: auto;
+                padding: 4px 0;
+            }
+            .emoji-btn {
+                font-size: 20px;
+                padding: 4px;
+                cursor: pointer;
+                text-align: center;
+                border-radius: 6px;
+                transition: background 0.2s;
+            }
+            .emoji-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                transform: scale(1.2);
+            }
+        `;
+        document.head.appendChild(style);
+        console.log('💉 Context Menu CSS injected!');
+    }
+
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+
+    // 1. Position Logic
+    let x = e.clientX;
+    let y = e.clientY;
+    const menuWidth = 280;
+    const menuHeight = 300;
+
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    // 2. Toolbar Container
+    const toolbar = document.createElement('div');
+    toolbar.className = 'context-menu-toolbar';
+    menu.appendChild(toolbar);
+
+    // Initial Buttons Render Function
+    const renderDefaultButtons = () => {
+        toolbar.innerHTML = '';
+        toolbar.classList.remove('confirming');
+
+        // Edit Button
+        const editBtn = document.createElement('div');
+        editBtn.className = 'context-action-btn edit';
+        editBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        `;
+        editBtn.title = "Редагувати";
+        editBtn.onclick = () => {
+            if (window.initEditMessage) window.initEditMessage(chatId, msgId);
+            menu.remove();
+        };
+
+        // Delete Button (Triggers Confirmation)
+        const deleteBtn = document.createElement('div');
+        deleteBtn.className = 'context-action-btn delete';
+        deleteBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+        `;
+        deleteBtn.title = "Видалити";
+        deleteBtn.onclick = () => renderConfirmationButtons(); // Swap to confirm mode
+
+        toolbar.appendChild(editBtn);
+        toolbar.appendChild(deleteBtn);
+    };
+
+    // Confirmation Buttons Render Function
+    const renderConfirmationButtons = () => {
+        toolbar.innerHTML = ''; // Clear
+        toolbar.classList.add('confirming'); // Add red style hint
+
+        // Confirm (Check)
+        const confirmBtn = document.createElement('div');
+        confirmBtn.className = 'context-action-btn confirm-delete';
+        confirmBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        `;
+        confirmBtn.title = "Підтвердити видалення";
+        confirmBtn.onclick = async () => {
+            // Loading State
+            confirmBtn.innerHTML = `<div class="spinner" style="width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>`;
+
+            try {
+                // Delete Logic (Replicated from message-sender.js logic but inline)
+                const msgEl = document.querySelector(`.message-bubble[data-message-id="${msgId}"]`);
+                if (msgEl) msgEl.style.opacity = '0.5'; // Optimistic
+
+                const { deleteMessage } = await import('../modules/api.js'); // Assuming relative path correct or mapped
+                // If path fails, fallback to window.initDeleteMessage if available, or try absolute.
+                // Since this is in `ui-renderer.js` inside `js/modules`, path to `api.js` is just `./api.js`.
+                // BUT `api.js` is imported in `main.js`. 
+                // Let's rely on global fallback if needed currently or correct path.
+                // Path from `public/js/modules/ui-renderer.js` to `public/js/modules/api.js` is `./api.js`.
+                const res = await deleteMessage(chatId, msgId);
+
+                if (res.success) {
+                    if (msgEl) msgEl.remove();
+                    // State cleanup
+                    if (state.allMessages) state.allMessages = state.allMessages.filter(m => String(m.message_id) !== String(msgId));
+                    console.log('🗑️ Deleted via context menu');
+                } else {
+                    alert('Error: ' + (res.error || 'Failed'));
+                    if (msgEl) msgEl.style.opacity = '1';
+                }
+            } catch (e) {
+                console.error('Context Delete Error:', e);
+                // Fallback to global if import fails?
+                alert('Delete failed');
+            }
+            menu.remove();
+        };
+
+        // Cancel (Cross)
+        const cancelBtn = document.createElement('div');
+        cancelBtn.className = 'context-action-btn cancel-delete';
+        cancelBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        `;
+        cancelBtn.title = "Скасувати";
+        cancelBtn.onclick = () => renderDefaultButtons(); // Revert
+
+        toolbar.appendChild(confirmBtn);
+        toolbar.appendChild(cancelBtn);
+    };
+
+    // Initialize Default State
+    renderDefaultButtons();
+
+
+    // 3. Emoji Grid
+    const emojiGrid = document.createElement('div');
+    emojiGrid.className = 'emoji-grid';
 
     const emojis = [
         '👍', '👎', '❤️', '🔥', '🥰', '👏', '😁', '🤔',
         '🤯', '😱', '🤬', '😢', '🎉', '🤩', '🤮', '💩',
         '🙏', '👌', '🕊️', '🤡', '🥱', '🥴', '😍', '🐳',
-        '❤️‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆',
-        '💔', '🖕', '😐', '🍓', '🍾', '💋', '😴', '👀'
+        '❤️‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆'
     ];
 
     emojis.forEach(emoji => {
         const btn = document.createElement('span');
         btn.textContent = emoji;
-        btn.style.cssText = `cursor: pointer; font-size: 22px; padding: 6px; border-radius: 8px; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;`;
-
-        btn.onmouseenter = () => { btn.style.background = 'rgba(100,181,246,0.25)'; btn.style.transform = 'scale(1.2)'; };
-        btn.onmouseleave = () => { btn.style.background = 'transparent'; btn.style.transform = 'scale(1)'; };
-
+        btn.className = 'emoji-btn';
         btn.onclick = async () => {
             await window.handleReaction(chatId, msgId, emoji);
-            picker.remove();
+            menu.remove();
         };
-        picker.appendChild(btn);
+        emojiGrid.appendChild(btn);
     });
 
-    document.body.appendChild(picker);
+    menu.appendChild(emojiGrid);
+    document.body.appendChild(menu);
 
-    // Close on outside click
+    // Close Handler
     const closeListener = (evt) => {
-        if (!picker.contains(evt.target)) {
-            picker.remove();
+        if (!menu.contains(evt.target)) {
+            console.log('🖐️ Closing Context Menu (Click Outside)');
+            menu.remove();
             document.removeEventListener('click', closeListener);
         }
     };
-    // Delay slightly to avoid immediate close from the triggering click
-    setTimeout(() => document.addEventListener('click', closeListener), 10);
+    // 🌿 Delay slightly to avoid immediate trigger
+    setTimeout(() => document.addEventListener('click', closeListener), 100);
 };
+
+
 
 // Handle Reaction API Call (Toggle Logic) 🌿
 window.handleReaction = async function (chatId, msgId, emoji) {
@@ -1231,7 +1484,7 @@ function updateHeaderAvatar(chat) {
     avatarEl.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: ${color}; border-radius: 50%; color: white; font-weight: bold;">${letter}</div>`;
 
     // 🌿 Use Backend-Provided Info
-    console.log(`🖼️ Header avatar for chat ${chat.id}: photo=${chat.photo}`);
+    console.log(`🖼️ Header avatar for chat ${chat.id}: photo = ${chat.photo}`);
     if (chat.photo && chat.photo !== 'none') {
         avatarEl.innerHTML = `<img src="${chat.photo}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.remove(); this.parentElement ? this.parentElement.innerText = '${letter}' : null;">`;
     } else {
@@ -1256,7 +1509,7 @@ function requestAvatarLoad(userId) {
 
     window.pendingAvatarRequests.add(userId);
 
-    fetch(`/api/get-user-photo?user_id=${userId}`)
+    fetch(`/ api / get - user - photo ? user_id = ${userId} `)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
             if (data && data.url) {
@@ -1264,12 +1517,12 @@ function requestAvatarLoad(userId) {
                 // Live update
 
                 // 1. Message Bubbles
-                document.querySelectorAll(`.message-avatar[data-user-id="${userId}"]`).forEach(el => {
-                    el.innerHTML = `<img src="${data.url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                document.querySelectorAll(`.message - avatar[data - user - id="${userId}"]`).forEach(el => {
+                    el.innerHTML = `< img src = "${data.url}" style = "width: 100%; height: 100%; object-fit: cover;" > `;
                 });
 
                 // 2. Chat List Avatars
-                document.querySelectorAll(`.chat-list-avatar[data-user-id="${userId}"]`).forEach(el => {
+                document.querySelectorAll(`.chat - list - avatar[data - user - id="${userId}"]`).forEach(el => {
                     if (el.tagName !== 'IMG') {
                         const img = document.createElement('img');
                         img.src = data.url;
@@ -1287,7 +1540,7 @@ function requestAvatarLoad(userId) {
             }
         })
         .catch(err => {
-            console.warn(`Failed to load avatar for ${userId}:`, err);
+            console.warn(`Failed to load avatar for ${userId}: `, err);
             window.failedAvatars.add(userId);
         })
         .finally(() => {
@@ -1302,3 +1555,45 @@ export function getInitials(name) {
     if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name[0].toUpperCase();
 }
+// 🌿 Custom Confirm Modal (Replaces native confirm)
+window.showConfirmModal = function (title, text, onConfirm) {
+    // 1. Create Overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+
+    // 2. Create Modal Content
+    overlay.innerHTML = `
+        < div class="custom-modal" >
+            <h3>${title}</h3>
+            <p>${text}</p>
+            <div class="custom-modal-actions">
+                <button class="modal-btn cancel" id="modalCancelBtn">Відміна</button>
+                <button class="modal-btn danger" id="modalConfirmBtn">Видалити</button>
+            </div>
+        </div >
+        `;
+
+    // 3. Append to body
+    document.body.appendChild(overlay);
+
+    // 4. Handlers
+    const close = () => {
+        overlay.style.opacity = '0'; // Fade out
+        setTimeout(() => overlay.remove(), 200);
+    };
+
+    const cancelBtn = overlay.querySelector('#modalCancelBtn');
+    if (cancelBtn) cancelBtn.onclick = close;
+
+    const confirmBtn = overlay.querySelector('#modalConfirmBtn');
+    if (confirmBtn) confirmBtn.onclick = () => {
+        close();
+        if (typeof onConfirm === 'function') onConfirm();
+    };
+
+    // Close on click outside
+    overlay.onclick = (e) => {
+        if (e.target === overlay) close();
+    };
+};
+

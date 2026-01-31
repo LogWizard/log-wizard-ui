@@ -39,8 +39,10 @@
     background-color: #0e1621;
     border: 1px solid #2b5278;
     color: #fff;
-    padding: 10px 16px;
-    border-radius: 20px;
+    padding: 12px 16px;
+    /* 🌿 Increased padding */
+    border-radius: 0;
+    /* 🌿 Removed border radius */
     font-size: 14px;
     font-family: inherit;
     outline: none;

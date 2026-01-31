@@ -161,8 +161,8 @@ export async function fetchMessages() {
 
 export async function fetchSingleChatUpdate(chatId) {
     try {
-        // 🌿 FIX: Fetch LATEST 50 messages to ensure we get updates, not oldest 500
-        const chatRes = await fetch(`/messages?group=${chatId}&limit=50`);
+        // 🌿 FIX: Fetch LATEST 100 messages to ensure we get updates for recently visible messages
+        const chatRes = await fetch(`/messages?group=${chatId}&limit=100`);
         if (chatRes.ok) {
             const newMsgs = await chatRes.json();
             if (newMsgs.length > 0) {
@@ -388,5 +388,34 @@ export async function sendReaction(chatId, messageId, emoji, action = 'add') {
     } catch (error) {
         console.error('Error sending reaction:', error);
         return { success: false, error: error.message };
+    }
+}
+
+// 🌿 Edit & Delete API Wrappers
+export async function deleteMessage(chatId, messageId) {
+    try {
+        const response = await fetch('/api/delete-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, message_id: messageId })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function editMessage(chatId, messageId, text, isCaption = false) {
+    try {
+        const response = await fetch('/api/edit-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: text, is_caption: isCaption })
+        });
+        return await response.json();
+    } catch (e) {
+        console.error('Edit Message API Error:', e);
+        return { success: false, error: e.message };
     }
 }

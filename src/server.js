@@ -6,8 +6,10 @@ import cors_proxy from 'cors-anywhere';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 import { ConfigManager } from './config-manager.js';
-import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, sendVideoNote, sendVoiceNote, setReaction } from './api/send-message.js';
+import { sendMessage, sendPhoto, sendVideo, sendAudio, sendVoice, sendSticker, sendVideoNote, sendVoiceNote, setReaction, deleteMessage, editMessage } from './api/send-message.js';
 import { upload, uploadFile } from './api/upload.js';
 import { getManualMode, setManualMode, getAllManualModes } from './api/manual-mode.js';
 import { ChatsScanner } from './services/chats-scanner.js';
@@ -20,6 +22,8 @@ import fetch from 'node-fetch'; // Ensure fetch is available
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appDirectory = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(appDirectory, '.env') });
+dotenv.config({ path: path.join(appDirectory, '..', 'ks_gys_bot', '.env'), override: false });
 const configManager = new ConfigManager(path.join(appDirectory, 'config.json'));
 
 const options = {
@@ -29,6 +33,67 @@ const options = {
 
 const app = express();
 const server = https.createServer(options, app);
+
+const serverConfig = configManager.read();
+const BOT_TOKEN = process.env.BOT_TOKEN || serverConfig['Bot Token'] || '';
+const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+let userDbPool = null;
+const getUserDbPool = async () => {
+    if (userDbPool) return userDbPool;
+    const host = process.env.BOTDB_HOST || process.env.USER_DB_HOST || process.env.DB_HOST;
+    const port = parseInt(process.env.BOTDB_PORT || process.env.USER_DB_PORT || process.env.DB_PORT || '3306', 10);
+    const user = process.env.BOTDB_USER || process.env.USER_DB_USER || process.env.DB_USER;
+    const password = process.env.BOTDB_PASSWORD || process.env.USER_DB_PASSWORD || process.env.DB_PASSWORD;
+    const database = process.env.BOTDB_NAME || process.env.USER_DB_NAME || process.env.DB_NAME;
+
+    if (!host || !user || !database) {
+        console.warn('⚠️ Bot DB not configured (missing BOTDB_HOST/USER/NAME)');
+        return null;
+    }
+
+    console.log('🌿 Connecting to Bot DB...', { host, port, user, database });
+
+    try {
+        userDbPool = mysql.createPool({
+            host,
+            port,
+            user,
+            password,
+            database,
+            waitForConnections: true,
+            connectionLimit: 5,
+            multipleStatements: true
+        });
+        // Test connection
+        const conn = await userDbPool.getConnection();
+        conn.release();
+        console.log('✅ Bot DB connected successfully!');
+    } catch (err) {
+        console.error('❌ Bot DB connection failed:', err.message);
+        userDbPool = null;
+        return null;
+    }
+
+    return userDbPool;
+};
+
+const getFileUrlById = async (fileId) => {
+    if (!BOT_TOKEN || !fileId) return null;
+    try {
+        const fileRes = await fetch(`${TELEGRAM_API}/getFile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_id: fileId })
+        });
+        const fileData = await fileRes.json();
+        const filePath = fileData?.result?.file_path;
+        if (!filePath) return null;
+        return `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+    } catch (e) {
+        return null;
+    }
+};
 
 app.use(express.json());
 async function readConfigPrams() { return configManager.read(); }
@@ -69,15 +134,15 @@ export async function createMessageServer() {
         corsServerPort = paramsOnConfig['Cors Server Port'];
     }
 
-    /* Цей сервер необхідний для обходу CORS */
+    /* 🌿 CORS Anywhere disabled - not needed anymore
     cors_proxy.createServer({
-        originWhitelist: [], // Allow all origins
+        originWhitelist: [],
         requireHeader: ['origin', 'x-requested-with'],
         removeHeaders: ['cookie', 'cookie2']
     }).listen(corsServerPort, function () {
         console.log(`Server CORS Anywhere started on port ${corsServerPort}`);
     });
-    /* Цей сервер необхідний для обходу CORS */
+    */
 
     // 🌿 Init DB & Services (Background)
     await initDB();
@@ -90,6 +155,73 @@ export async function createMessageServer() {
         const avatarService = new AvatarService(appDirectory);
         avatarService.start();
     }
+
+    let refreshOffset = 0;
+    const refreshBatchSize = 200;
+    const refreshIntervalMs = 105 * 60 * 1000;
+    const refreshRecentMediaUrls = async () => {
+        if (!BOT_TOKEN) return;
+        const pool = getPool();
+        if (!pool) return;
+
+        try {
+            const [rows] = await pool.query(`
+                SELECT unique_id, raw_data, type, media_url
+                FROM messages
+                WHERE date >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+                  AND type IN ('photo','video','audio','voice','video_note','sticker','animation')
+                ORDER BY date DESC
+                LIMIT ? OFFSET ?
+            `, [refreshBatchSize, refreshOffset]);
+
+            if (!rows || rows.length === 0) {
+                refreshOffset = 0;
+                return;
+            }
+
+            for (const row of rows) {
+                let msg = row.raw_data;
+                if (!msg) continue;
+                if (typeof msg === 'string') {
+                    try { msg = JSON.parse(msg); } catch { continue; }
+                }
+
+                const fileId =
+                    msg?.photo?.length ? msg.photo[msg.photo.length - 1].file_id :
+                        msg?.video?.file_id ||
+                        msg?.audio?.file_id ||
+                        msg?.voice?.file_id ||
+                        msg?.video_note?.file_id ||
+                        msg?.sticker?.file_id ||
+                        msg?.animation?.file_id ||
+                        null;
+
+                if (!fileId) continue;
+
+                const url = await getFileUrlById(fileId);
+                if (!url) continue;
+
+                if (msg.photo?.length) msg.url_photo = url;
+                if (msg.video) msg.url_video = url;
+                if (msg.audio) msg.url_audio = url;
+                if (msg.voice) msg.url_voice = url;
+                if (msg.video_note) msg.url_video_note = url;
+                if (msg.sticker) msg.url_sticker = url;
+                if (msg.animation) msg.url_animation = url;
+
+                await pool.query(
+                    `UPDATE messages SET raw_data = ?, media_url = ? WHERE unique_id = ?`,
+                    [JSON.stringify(msg), url, row.unique_id]
+                );
+            }
+
+            refreshOffset += refreshBatchSize;
+        } catch (e) {
+            console.error('Media URL refresh error:', e.message);
+        }
+    };
+
+    setInterval(refreshRecentMediaUrls, refreshIntervalMs);
     let folderPath = path.join(MSG_PATH, new Date().toLocaleDateString('uk-UA'), '/');
 
     /* Manual Mode API 🌿 */
@@ -140,6 +272,128 @@ export async function createMessageServer() {
     app.post('/api/send-video-note', sendVideoNote);
     app.post('/api/send-voice-note', sendVoiceNote);
     app.post('/api/set-reaction', setReaction);
+
+    // 🌿 File URL Resolver
+    app.get('/api/file-url/:fileId', async (req, res) => {
+        const { fileId } = req.params;
+        const url = await getFileUrlById(fileId);
+        if (!url) return res.status(404).json({ error: 'File not found' });
+        res.json({ url });
+    });
+
+    // 🌿 User profile from DB
+    app.get('/api/user/:id', async (req, res) => {
+        try {
+            const tgId = req.params.id;
+
+            // Спочатку шукаємо в БД бота по tg_id
+            const userDb = await getUserDbPool();
+            if (userDb) {
+                try {
+                    const [rows] = await userDb.query('SELECT * FROM users WHERE tg_id = ? LIMIT 1', [tgId]);
+                    if (rows && rows.length > 0) {
+                        const u = rows[0];
+                        // Маппимо поля для фронту з нормальними лейблами
+                        return res.json({
+                            id: u.tg_id,
+                            first_name: u.LastFirsNames || u.username,
+                            real_name: u.name,
+                            username: u.username,
+                            'Пошта': u.email,
+                            'XRM Логін': u.xrm_login,
+                            'Баланс': u.balans,
+                            'Авторизація': u.auth,
+                            'SGE Авторизація': u.sge_auth
+                        });
+                    }
+                } catch (e) {
+                    console.error('User DB query error:', e.message);
+                }
+            }
+
+            // Fallback на основну БД
+            const pool = getPool();
+            if (!pool) return res.status(503).json({ error: 'DB not ready' });
+            const [rows] = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [tgId]);
+            if (!rows || rows.length === 0) return res.status(404).json({ error: 'User not found' });
+            res.json(rows[0]);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // 🌿 Sticker Sets API
+    app.get('/api/sticker-sets', async (req, res) => {
+        try {
+            const sets = await getStickerSets();
+            res.json(sets);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/sticker-sets/import', async (req, res) => {
+        const { setName } = req.body || {};
+        if (!setName) return res.status(400).json({ error: 'setName is required' });
+        try {
+            await addStickerSet(setName);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/sticker-sets/:name', async (req, res) => {
+        const { name } = req.params;
+        if (!BOT_TOKEN) return res.status(500).json({ error: 'Bot token not configured' });
+
+        try {
+            const response = await fetch(`${TELEGRAM_API}/getStickerSet`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await response.json();
+            if (!data.ok) throw new Error(data.description || 'Failed to load sticker set');
+
+            const stickers = await Promise.all((data.result.stickers || []).map(async (sticker) => {
+                const previewId = sticker.thumbnail?.file_id || sticker.file_id;
+                let url = null;
+                try {
+                    const fileRes = await fetch(`${TELEGRAM_API}/getFile`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_id: previewId })
+                    });
+                    const fileData = await fileRes.json();
+                    const filePath = fileData?.result?.file_path;
+                    if (filePath) url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+                } catch (e) {
+                    url = null;
+                }
+                return {
+                    file_id: sticker.file_id,
+                    file_unique_id: sticker.file_unique_id,
+                    emoji: sticker.emoji,
+                    url,
+                    is_animated: Boolean(sticker.is_animated),
+                    is_video: Boolean(sticker.is_video)
+                };
+            }));
+
+            res.json({ name: data.result.name, title: data.result.title, stickers });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // 🌿 File Upload API (CRITICAL - Was missing!)
+    app.post('/api/upload', upload.single('file'), uploadFile);
+
+    // 🌿 Edit & Delete Actions
+    app.post('/api/delete-message', deleteMessage);
+    app.post('/api/edit-message', editMessage);
+
 
     /* Цей роутер відповідає за get запитів /message */
     app.get('/messages', async (req, res) => {
@@ -241,24 +495,30 @@ export async function createMessageServer() {
                 }
 
                 const [archiveRows] = await pool.query(archiveQuery, archiveParams);
-                rows = [...archiveRows, ...rows]; // Combine
+                // Combine and Deduplicate (Priority to 'messages' table) 🌿
+                const messageMap = new Map();
+                // Add archive first (lower priority)
+                archiveRows.forEach(r => messageMap.set(r.unique_id, r));
+                // Add main table (will overwrite archive if ID matches)
+                rows.forEach(r => messageMap.set(r.unique_id, r));
+
+                rows = Array.from(messageMap.values());
             }
 
             // 5. Final Sort 🌿
             if (limitParam) {
-                // We fetched DESC (Newest First).
-                // Sort combined results DESC to ensure correct top N
+                // Sort by date DESC for limit slice
                 rows.sort((a, b) => new Date(b.date) - new Date(a.date));
-                // Slice to limit (in case archive + main > limit)
                 if (rows.length > limitParam) rows = rows.slice(0, limitParam);
                 // Reverse to ASC (Chronological) for frontend
                 rows.reverse();
             } else {
-                // Legacy ASC sort (Oldest First)
+                // Default ASC sort
                 rows.sort((a, b) => new Date(a.date) - new Date(b.date));
             }
 
             // 5. Transform for Frontend
+            res.set('Cache-Control', 'no-store');
             const messages = rows.map(row => {
                 // Use raw_data if available for full fidelity, else construct
                 let msg = row.raw_data;
@@ -428,11 +688,12 @@ export async function createMessageServer() {
 
     /* Цей роутер відповідає за обробку запиту /chat */
     app.get('/chat', async (req, res) => {
-        console.log(__dirname);
+        // console.log(__dirname); // 🌿 Removed verbose logging
         const filePath = path.join(appDirectory, '/public/index.html');
-        console.log(filePath);
+        // console.log(filePath); // 🌿 Removed verbose logging
         try {
             const data = await fs.promises.readFile(filePath);
+            res.set('Cache-Control', 'no-store'); // 🌿 Force fresh load
             res.status(200).send(data.toString());
         } catch (err) {
             res.status(404).send();
@@ -643,6 +904,34 @@ export async function createMessageServer() {
         }
     });
 
+    // 🌿 Auto-Refresh Media URL (New!)
+    app.get('/api/refresh-file-url', async (req, res) => {
+        try {
+            const { file_id } = req.query;
+            if (!file_id) return res.status(400).json({ error: 'file_id required' });
+
+            const paramsOnConfig = await configManager.read();
+            const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token'];
+
+            if (!token) return res.status(500).json({ error: 'No Bot Token' });
+
+            // Call Telegram API
+            const pathResp = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${file_id}`);
+            const pathData = await pathResp.json();
+
+            if (!pathData.ok) {
+                return res.status(400).json({ error: pathData.description });
+            }
+
+            const newUrl = `https://api.telegram.org/file/bot${token}/${pathData.result.file_path}`;
+            res.json({ url: newUrl });
+
+        } catch (error) {
+            console.error('Refresh URL Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+
     // 🌿 Static Files (Avatars) - Serve cached avatars
     app.use('/avatars', express.static(path.join(appDirectory, 'public', 'avatars')));
 
@@ -678,12 +967,12 @@ export async function createMessageServer() {
     });
     /* from use https server */
 
+    /* from use http server - 🌿 Enabled for Vite dev compatibility */
+    app.listen(3333, () => {
+        console.log(`HTTP Express server started on port 3333`);
+    });
     /* from use http server */
-    // app.listen(port, () => {
-    //     logStr = 'http://';
-    //     console.log(`Express server started on port ${port}`);
-    // });
-    /* from use http server */
+
 
     async function writeConfigPrams(params) {
         const configData = configManager.read();

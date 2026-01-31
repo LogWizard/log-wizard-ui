@@ -108,4 +108,16 @@ src/certificate.pem
 src/privatekey.pem
 log-wizard-ui.lnk
 START.bat
-START.bat
+START_ALL.bat
+KILL_ALL.bat
+
+# Uploads and cache
+public/uploads/
+public/avatars/
+chats_cache.json
+temp_check.txt
+add_avatar_cache_columns.sql
+verify_migration.js
+
+# Build output
+frontend/dist/

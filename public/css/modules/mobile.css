@@ -275,11 +275,13 @@
     }
 
     .formatting-toolbar button {
-        padding: 8px 12px;
-        font-size: 13px;
+        padding: 10px 14px;
+        /* 🌿 Increased size */
+        font-size: 14px;
         background-color: #242f3d;
         border: none;
-        border-radius: 6px;
+        border-radius: 0;
+        /* 🌿 Removed border radius */
         color: #8b98a7;
         cursor: pointer;
         transition: all 0.2s;
@@ -303,8 +305,10 @@
 
     .message-input {
         flex: 1;
-        border-radius: 20px;
-        padding: 10px 16px;
+        border-radius: 0;
+        /* 🌿 Removed border radius */
+        padding: 12px 16px;
+        /* 🌿 Increased height slightly */
         font-size: 15px;
         background-color: #0e1621;
         border: 1px solid #2b5278;

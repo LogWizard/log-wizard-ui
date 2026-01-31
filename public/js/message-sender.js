@@ -1,7 +1,11 @@
 // ========== Message Sender Module 🌿 ==========
 // Функції глобальні (без ES modules)
 
-let pendingAttachment = null; // { url, type, file } 🌿
+// { url, type, file } 🌿
+let pendingAttachment = null;
+// 🌿 Edit State
+let editingMessageId = null;
+window.editingMessageId = null;
 
 /**
  * Update Preview UI
@@ -307,6 +311,42 @@ function initMessageInput() {
 
     // Init Stickers 🌿
     initStickerPicker();
+
+    // Init Draft Auto-Save 🌿
+    initDraftAutoSave();
+}
+
+/**
+ * Initialize Draft Auto-Save 🌿
+ */
+function initDraftAutoSave() {
+    const input = document.getElementById('messageInput');
+
+    // 1. Text Input Listener
+    if (input) {
+        input.addEventListener('input', (e) => {
+            const chatId = window.selectedChatId;
+            if (chatId) {
+                localStorage.setItem(`draft_${chatId}`, e.target.value);
+            }
+        });
+    }
+
+    // 2. Quill Listener (if active)
+    if (window.quill) {
+        window.quill.on('text-change', () => {
+            const chatId = window.selectedChatId;
+            if (chatId) {
+                const html = window.quill.root.innerHTML;
+                // Only save if not empty default
+                if (html !== '<p><br></p>') {
+                    localStorage.setItem(`draft_${chatId}`, html);
+                } else {
+                    localStorage.removeItem(`draft_${chatId}`);
+                }
+            }
+        });
+    }
 }
 
 /**
@@ -742,6 +782,7 @@ let isSending = false; // 🌿 Module-level lock
  * Handle send message - підтримка Quill WYSIWYG 🌿
  */
 async function handleSendMessage() {
+    console.log('🚀 handleSendMessage triggered', { isSending, editingMessageId: window.editingMessageId });
     if (isSending) return; // 🛡️ Prevent double submit
 
     // Support both Quill and legacy input
@@ -780,6 +821,52 @@ async function handleSendMessage() {
         pendingAttachment = null;
         updateAttachmentPreview();
     }
+
+    // 🌿 Clear Draft (Local Storage)
+    if (selectedChatId) {
+        localStorage.removeItem(`draft_${selectedChatId}`);
+    }
+
+    // 🌿 CHECK IF EDITING
+    if (editingMessageId) {
+        try {
+            const { editMessage } = await import('./modules/api.js');
+            // Determine if it's a caption or text
+            const originalMsg = state.allMessages.find(m => String(m.message_id) === String(editingMessageId));
+            const isCaption = originalMsg && !originalMsg.text && (originalMsg.caption || originalMsg.photo || originalMsg.video || originalMsg.document);
+
+            // 🌿 Clean HTML for Telegram (Remove <p>, replace with \n)
+            const cleanHtml = htmlText
+                .replace(/<p>/g, '')
+                .replace(/<\/p>/g, '\n')
+                .replace(/<br>/g, '\n')
+                .replace(/&nbsp;/g, ' ')
+                .trim();
+
+            console.log('✏️ Sending Edit (Cleaned):', { editingMessageId, isCaption, cleanHtml });
+
+            const res = await editMessage(selectedChatId, editingMessageId, cleanHtml, !!isCaption);
+
+            if (res.success) {
+                console.log('✅ Message edited');
+                // Optimistic UI Update 🌿
+                const msgBubble = document.querySelector(`.message-bubble[data-message-id="${editingMessageId}"] .message-text`);
+                if (msgBubble) msgBubble.innerHTML = cleanHtml.replace(/\n/g, '<br>'); // Display with BRs in UI
+
+                // Close Edit Mode
+                cancelEditMode();
+            } else {
+                alert('Edit Failed: ' + res.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Edit Error');
+        } finally {
+            isSending = false;
+        }
+        return;
+    }
+
 
     // Convert Quill HTML to Telegram HTML using DOM 🌿
     const tempDiv = document.createElement('div');
@@ -1126,22 +1213,191 @@ function initPasteHandler() {
                         return;
                     }
 
+                    // Set as pending and update UI
                     pendingAttachment = {
                         url: url,
                         type: file.type,
                         file: file
                     };
                     updateAttachmentPreview();
-                    console.log('✅ Pasted file ready');
 
-                } catch (error) {
-                    console.error('Paste upload error:', error);
-                    alert('Error pasting file: ' + error.message);
+                } catch (err) {
+                    console.error('Paste upload error:', err);
                 }
-
-                // Only handle the first file
-                return;
             }
         }
     });
 }
+
+// 🌿 Edit Message Init (Global)
+window.initEditMessage = function (chatId, messageId) {
+    console.log('✏️ initEditMessage called', { chatId, messageId });
+    const msg = state.allMessages.find(m => String(m.message_id) === String(messageId));
+    if (!msg) return alert('Message not found locally');
+
+    editingMessageId = messageId;
+    window.editingMessageId = messageId;
+
+    // Show visual indicator
+    // Try to find the wrapper directly
+    const wrapper = document.querySelector('.message-input-wrapper') || document.querySelector('.input-wrapper');
+    const container = document.querySelector('.message-input-container') || document.body;
+
+    let bar = document.getElementById('edit-bar');
+
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'edit-bar';
+        // 🌿 Enhanced Styling: Blue accent left, dark bg, seamless
+        bar.style.cssText = 'background: #1e2c3a; color: #64b5f6; padding: 10px 16px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #64b5f6; width: 100%; box-sizing: border-box; margin-bottom: 1px; animation: slideIn 0.2s ease-out;';
+
+        // Add animation keyframes if needed, but simple insertion is fine.
+
+        if (wrapper && wrapper.parentNode) {
+            // Insert BEFORE the input wrapper (so it sits on top)
+            wrapper.parentNode.insertBefore(bar, wrapper);
+        } else {
+            // Fallback: Prepend to container
+            container.prepend(bar);
+        }
+    }
+
+    const displayText = (msg.text || msg.caption || 'Media Attachment').replace(/\n/g, ' ');
+
+    bar.innerHTML = `
+        <div style="display:flex; flex-direction:column; overflow: hidden;">
+            <span style="font-weight:bold; color: #64b5f6; margin-bottom: 2px;">✏️ Editing Message</span>
+            <span style="color: #8b98a7; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;">${displayText}</span>
+        </div>
+        <span id="cancelEditBtn" style="cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b98a7" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </span>
+    `;
+
+    // Bind click immediately
+    const cancelBtn = bar.querySelector('#cancelEditBtn');
+    if (cancelBtn) {
+        cancelBtn.onclick = cancelEditMode;
+        cancelBtn.onmouseenter = () => cancelBtn.style.background = 'rgba(255,255,255,0.1)';
+        cancelBtn.onmouseleave = () => cancelBtn.style.background = 'transparent';
+    }
+
+    // Populate Input
+    const textToEdit = msg.text || msg.caption || '';
+    if (window.quill) {
+        window.quill.clipboard.dangerouslyPasteHTML(textToEdit); // Preserves simple HTML
+        // 🌿 Focus the editor!
+        setTimeout(() => window.quill.focus(), 50);
+    } else {
+        const input = document.getElementById('messageInput');
+        if (input) {
+            input.value = textToEdit;
+            input.focus();
+        }
+    }
+
+    // Change Button Icon (Optional)
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" class="send-icon" fill="none" stroke="#64b5f6" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+    `; // Checkmark/Save Icon
+};
+
+function cancelEditMode() {
+    console.log('❌ cancelEditMode called');
+    editingMessageId = null;
+    window.editingMessageId = null;
+    const bar = document.getElementById('edit-bar');
+    if (bar) bar.remove();
+
+    // Reset Input
+    if (window.quill) window.quill.setText('');
+    else {
+        const input = document.getElementById('messageInput');
+        if (input) input.value = '';
+    }
+
+    // Reset Icon
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" class="send-icon" fill="non" stroke="currentColor" stroke-width="2">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+    `;
+}
+
+// 🌿 Delete Message Init
+window.initDeleteMessage = async function (chatId, messageId) {
+    // alert('DEBUG: Start Delete Function'); 
+    console.log('🗑️ initDeleteMessage called', { chatId, messageId });
+
+    if (!chatId) { alert('Error: No Chat ID'); return; }
+
+    // Use window.confirm explicitly and log result
+    const isConfirmed = window.confirm('Видалити це повідомлення?');
+    // alert('DEBUG: Confirm result: ' + isConfirmed);
+
+    if (!isConfirmed) return;
+
+    // Optimistic UI Removal
+    const msgEl = document.querySelector(`.message-bubble[data-message-id="${messageId}"]`);
+    if (msgEl) {
+        msgEl.style.opacity = '0.5';
+    }
+
+    try {
+        // alert('Deleting... Pass 1'); // Debug Force
+        const { deleteMessage } = await import('./modules/api.js');
+        const res = await deleteMessage(chatId, messageId);
+        console.log('🗑️ Delete result:', res);
+
+        if (res.success) {
+            if (msgEl) msgEl.remove();
+            // Remove from state
+            if (state.allMessages) state.allMessages = state.allMessages.filter(m => String(m.message_id) !== String(messageId));
+            alert('Deleted Successfully! ✅');
+        } else {
+            alert('Error deleting: ' + (res.error || 'Unknown error'));
+            if (msgEl) msgEl.style.opacity = '1';
+        }
+    } catch (e) {
+        console.error('Delete API Error:', e);
+        alert('Failed to delete message: ' + e.message);
+        if (msgEl) msgEl.style.opacity = '1';
+    }
+};
+
+
+
+
+
+
+// 🌿 Event Bindings (Ensure these are active!)
+document.addEventListener('DOMContentLoaded', () => {
+    // Send Button
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) {
+        // Remove old to prevent duplicates if hot-reloaded
+        const newBtn = sendBtn.cloneNode(true);
+        sendBtn.parentNode.replaceChild(newBtn, sendBtn);
+        newBtn.addEventListener('click', handleSendMessage);
+        console.log('✅ Send Button Event Listener Attached');
+    }
+
+    // Enter Key (Legacy Input)
+    const input = document.getElementById('messageInput');
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+        });
+    }
+});
+
+// 🌿 Make handleSendMessage globally available for inline calls if needed
+window.handleSendMessage = handleSendMessage;
+console.log('✅ message-sender.js loaded and handleSendMessage exposed');

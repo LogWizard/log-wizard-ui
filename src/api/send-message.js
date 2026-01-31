@@ -322,10 +322,26 @@ export async function sendVideoNote(req, res) {
     const localOutputPath = path.join(appDirectory, 'public', 'uploads', `note-${filename}.mp4`); // Ensure .mp4
 
     try {
-        if (!fs.existsSync(localInputPath)) throw new Error('Input file not found');
+        if (!fs.existsSync(localInputPath)) {
+            console.error(`❌ Input file not found: ${localInputPath}`);
+            throw new Error(`Input file not found: ${filename}`);
+        }
 
         console.log(`🎬 Processing Video Note: ${localInputPath}...`);
+
+        // 🌿 Check file size before processing
+        const stats = fs.statSync(localInputPath);
+        if (stats.size < 1000) {
+            throw new Error('Recording file is too small or corrupted');
+        }
+
         await convertVideoToNote(localInputPath, localOutputPath);
+
+        // 🌿 Verify output was created
+        if (!fs.existsSync(localOutputPath)) {
+            throw new Error('FFmpeg failed to create output file');
+        }
+
         console.log(`✅ Video Note Ready: ${localOutputPath}`);
 
         // Send processed file
@@ -341,14 +357,13 @@ export async function sendVideoNote(req, res) {
 
         const data = await response.json();
 
-        // Cleanup processed input file (optional) but keep note output
-        // fs.unlinkSync(localInputPath); 
-
-        if (!data.ok) throw new Error(data.description);
+        if (!data.ok) {
+            console.error('❌ Telegram API Error:', data);
+            throw new Error(data.description || 'Telegram API rejected the video note');
+        }
 
         if (data.result) {
             // Use the NEW processed URL for local storage/UI
-            // The file is physically at localOutputPath, which corresponds to uploads/note-filename.mp4
             const processedUrl = video_note.replace(filename, `note-${filename}.mp4`);
             data.result.url_video_note = processedUrl;
             if (data.result.date) data.result.time = new Date(data.result.date * 1000).toISOString();
@@ -359,10 +374,13 @@ export async function sendVideoNote(req, res) {
         res.json({ success: true, message: data.result });
 
     } catch (error) {
-        console.error('Error sending video note:', error);
+        console.error('❌ Error sending video note:', error.message);
+        console.error('   Input path:', localInputPath);
+        console.error('   Output path:', localOutputPath);
         res.status(500).json({ error: error.message });
     }
 }
+
 
 /**
  * POST /api/send-voice-note 🌿
@@ -492,6 +510,11 @@ export async function setReaction(req, res) {
                         if (shouldRemove) {
                             reactions[existingIdx].is_own = false;
                             if (reactions[existingIdx].total_count > 0) reactions[existingIdx].total_count--;
+
+                            // 🌿 If count is 0, remove the reaction entry entirely
+                            if (reactions[existingIdx].total_count <= 0) {
+                                reactions.splice(existingIdx, 1);
+                            }
                         } else {
                             // 🌿 Enforce Single Reaction: Unset others
                             reactions.forEach((r, idx) => {
@@ -501,8 +524,14 @@ export async function setReaction(req, res) {
                                 }
                             });
 
-                            reactions[existingIdx].is_own = true;
-                            // reactions[existingIdx].total_count++;
+                            // Remove any that dropped to 0
+                            reactions = reactions.filter(r => (r.total_count || 0) > 0 || r.is_own);
+
+                            // Find index again after filter (or use original if still there)
+                            const freshIdx = reactions.findIndex(r => (r.type?.emoji || r.emoji) === emoji);
+                            if (freshIdx >= 0) {
+                                reactions[freshIdx].is_own = true;
+                            }
                         }
                     } else if (!shouldRemove) {
                         // 🌿 Enforce Single Reaction: Unset others
@@ -521,7 +550,8 @@ export async function setReaction(req, res) {
                         });
                     }
 
-                    // If remove and not found, nothing to do
+                    // Final cleanup: remove any reactions with 0 count that aren't 'own'
+                    reactions = reactions.filter(r => (r.total_count || r.count || 0) > 0 || r.is_own);
 
                     // Save back
                     if (content.reactions?.results) {
@@ -542,7 +572,99 @@ export async function setReaction(req, res) {
             }
 
             if (!fileUpdated) {
-                console.warn(`Could not find local file for message ${message_id} to save reaction.`);
+                console.warn(`Could not find local file for message ${message_id} to save reaction. Falling back to DB update...`);
+                try {
+                    const pool = getPool();
+                    if (pool) {
+                        const uniqueId = `${chat_id}_${message_id}`;
+                        // Fetch current message from DB to get raw_data (Check both main and archive)
+                        let [rows] = await pool.query('SELECT raw_data, chat_id, message_id, from_id, date, text, caption, type, media_url FROM messages WHERE unique_id = ?', [uniqueId]);
+
+                        if (rows.length === 0) {
+                            [rows] = await pool.query('SELECT raw_data, chat_id, message_id, from_id, date, text, caption, type, media_url FROM messages_archive WHERE unique_id = ?', [uniqueId]);
+                        }
+
+                        if (rows.length > 0) {
+                            const row = rows[0];
+                            let content = row.raw_data;
+                            if (typeof content === 'string') content = JSON.parse(content);
+
+                            if (!content) {
+                                // Fallback construction if raw_data is empty
+                                content = {
+                                    message_id: row.message_id,
+                                    chat: { id: row.chat_id },
+                                    from: { id: row.from_id },
+                                    date: new Date(row.date).getTime() / 1000,
+                                    text: row.text,
+                                    caption: row.caption
+                                };
+                            }
+
+                            // 🌿 Robust Merge Logic
+                            let existingReactions = Array.isArray(content.reactions) ? content.reactions : (content.reactions?.results || []);
+
+                            // 1. Prepare NEW 'own' reaction
+                            const newOwnReaction = {
+                                type: { emoji },
+                                emoji: emoji,
+                                total_count: 1,
+                                is_own: !shouldRemove
+                            };
+
+                            // 2. Clear previous 'own' reactions (Enforce Single Reaction for Bot)
+                            if (!shouldRemove) {
+                                existingReactions.forEach(r => {
+                                    if (r.is_own === true || r.is_own === 1 || String(r.is_own) === 'true') {
+                                        r.is_own = false;
+                                        if (r.total_count > 0) r.total_count--;
+                                    }
+                                });
+                            }
+
+                            // 3. Merge and Deduplicate by Emoji
+                            const merged = [newOwnReaction, ...existingReactions];
+                            const uniqueMap = new Map();
+
+                            merged.forEach(r => {
+                                const e = r.type?.emoji || r.emoji;
+                                if (!e) return;
+
+                                const isCurrentOwn = r.is_own === true || r.is_own === 1 || String(r.is_own) === 'true';
+
+                                if (uniqueMap.has(e)) {
+                                    const existing = uniqueMap.get(e);
+                                    // Prioritize 'is_own' status
+                                    if (isCurrentOwn) existing.is_own = true;
+                                    // Sum counts? No, for reactions we usually have 1 per emoji (merged from users)
+                                    // In our DB, total_count is the total for that emoji.
+                                    if (isCurrentOwn && existing.total_count === 0) existing.total_count = 1;
+                                } else {
+                                    uniqueMap.set(e, {
+                                        type: { emoji: e },
+                                        emoji: e,
+                                        total_count: r.total_count || r.count || 1,
+                                        is_own: isCurrentOwn
+                                    });
+                                }
+                            });
+
+                            let reactions = Array.from(uniqueMap.values())
+                                .filter(r => (r.total_count > 0) || r.is_own);
+
+                            if (content.reactions?.results) content.reactions.results = reactions;
+                            else content.reactions = reactions;
+
+                            // 🌿 Update DB only
+                            await logToDB(content);
+                            console.log(`✅ Reaction synced to DB fallback for message ${message_id}`);
+                        } else {
+                            console.error(`❌ Message ${uniqueId} not found in DB either! Cannot sync reaction.`);
+                        }
+                    }
+                } catch (dbFallbackErr) {
+                    console.error('DB Fallback reaction update failed:', dbFallbackErr);
+                }
             }
 
         } catch (localErr) {
@@ -608,7 +730,14 @@ async function logToDB(msg) {
                 text = VALUES(text),
                 caption = VALUES(caption),
                 media_url = VALUES(media_url),
-                raw_data = VALUES(raw_data)
+                raw_data = CASE 
+                    -- 🌿 If NEW has NO reactions key but OLD HAS them, keep OLD
+                    WHEN JSON_EXTRACT(VALUES(raw_data), '$.reactions') IS NULL 
+                         AND JSON_EXTRACT(messages.raw_data, '$.reactions') IS NOT NULL
+                    THEN JSON_SET(VALUES(raw_data), '$.reactions', JSON_EXTRACT(messages.raw_data, '$.reactions'))
+                    -- 🌿 Else take NEW
+                    ELSE VALUES(raw_data)
+                END
         `, [
             uniqueId,
             msg.message_id,
@@ -624,5 +753,93 @@ async function logToDB(msg) {
         // console.log(`✅ Logged ${type} ${msg.message_id} to DB`);
     } catch (e) {
         console.error('DB Log Error:', e);
+    }
+}
+
+/**
+ * POST /api/delete-message 🌿
+ */
+export async function deleteMessage(req, res) {
+    const { chat_id, message_id } = req.body;
+    if (!chat_id || !message_id) return res.status(400).json({ error: 'Missing chat_id or message_id' });
+
+    try {
+        const response = await fetch(`${TELEGRAM_API}/deleteMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id, message_id })
+        });
+        const data = await response.json();
+
+        if (!data.ok) throw new Error(data.description);
+
+        // 🌿 Also delete from DB (or mark deleted)
+        const pool = getPool();
+        if (pool) {
+            await pool.query('DELETE FROM messages WHERE chat_id = ? AND message_id = ?', [chat_id, message_id]);
+        }
+
+        // Delete local file if exists
+        try {
+            // Basic file cleanup attempt (optional)
+        } catch (e) { }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * POST /api/edit-message 🌿
+ */
+export async function editMessage(req, res) {
+    const { chat_id, message_id, text, is_caption } = req.body;
+    if (!chat_id || !message_id || !text) return res.status(400).json({ error: 'Missing parameters' });
+
+    try {
+        const method = is_caption ? 'editMessageCaption' : 'editMessageText';
+        const body = {
+            chat_id,
+            message_id,
+            parse_mode: 'HTML'
+        };
+
+        if (is_caption) {
+            body.caption = text;
+        } else {
+            body.text = text;
+        }
+
+        const response = await fetch(`${TELEGRAM_API}/${method}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+
+        if (!data.ok) throw new Error(data.description);
+
+        // 🌿 Update DB
+        const pool = getPool();
+        if (pool) {
+            // Update text and raw_data
+            const uniqueId = `${chat_id}_${message_id}`;
+            const updateField = is_caption ? 'caption' : 'text';
+            const jsonPath = is_caption ? '$.caption' : '$.text';
+
+            await pool.query(`
+                UPDATE messages 
+                SET ${updateField} = ?, 
+                    raw_data = JSON_SET(raw_data, ?, ?) 
+                WHERE chat_id = ? AND message_id = ?
+            `, [text, jsonPath, text, chat_id, message_id]);
+        }
+
+        res.json({ success: true, result: data.result });
+    } catch (error) {
+        console.error('Error editing message:', error);
+        res.status(500).json({ error: error.message });
     }
 }

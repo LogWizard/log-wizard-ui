@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js --ignore config.json"
+    "dev": "nodemon index.js --ignore config.json --ignore config/",
+    "dev:all": "concurrently -n api,ui -c magenta,cyan \"npm run dev\" \"npm --prefix frontend run dev -- --host\"",
+    "build": "npm --prefix frontend run build"
   },
   "bin": {
     "log-wizard-ui": "./bin/global-run.js"
@@ -29,6 +31,7 @@
   "homepage": "https://github.com/LogWizard/log-wizard-ui#readme",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "cors-anywhere": "^0.4.4",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
@@ -39,5 +42,8 @@
     "node-fetch": "^3.3.2",
     "url": "^0.11.0",
     "user": "^0.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

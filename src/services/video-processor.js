@@ -1,8 +1,10 @@
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import path from 'path';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 /**
  * Convert video file to Telegram Video Note format (Round Video)
@@ -16,29 +18,77 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
  */
 export function convertVideoToNote(inputPath, outputPath) {
     return new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            .outputOptions([
-                '-vf', 'crop=min(iw\\,ih):min(iw\\,ih),scale=640:640:force_original_aspect_ratio=decrease', // Square Crop + Resize
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '28', // Good balance for file size
-                '-c:a', 'aac',
-                '-b:a', '128k',
-                '-movflags', '+faststart',
-                '-pix_fmt', 'yuv420p', // Ensure broader compatibility
-                '-t', '60' // Limit to 1 min (Telegram limit)
-            ])
-            .save(outputPath)
-            .on('end', () => {
-                console.log('✅ Video Note processed:', outputPath);
-                resolve(outputPath);
-            })
-            .on('error', (err) => {
-                console.error('❌ Video Note processing error:', err);
-                reject(err);
-            });
+        // 🌿 First, probe the file to check streams
+        ffmpeg.ffprobe(inputPath, (probeErr, metadata) => {
+            if (probeErr) {
+                console.error('❌ FFprobe error:', probeErr.message);
+                return reject(new Error(`Cannot analyze file: ${probeErr.message}`));
+            }
+
+            // Check for video stream
+            const hasVideo = metadata?.streams?.some(s => s.codec_type === 'video');
+            const hasAudio = metadata?.streams?.some(s => s.codec_type === 'audio');
+
+            if (!hasVideo) {
+                console.error('❌ No video stream found in file. This appears to be audio-only.');
+                return reject(new Error('Recording has no video stream. Please record with camera enabled.'));
+            }
+
+            console.log(`🎬 Streams detected: video=${hasVideo}, audio=${hasAudio}`);
+
+            // Build FFmpeg command using proper methods (not raw options for filters)
+            const command = ffmpeg(inputPath);
+
+            // 🌿 Video filters - using .videoFilters() for proper escaping on Windows
+            command.videoFilters([
+                {
+                    filter: 'crop',
+                    options: 'min(iw\\,ih):min(iw\\,ih)'
+                },
+                {
+                    filter: 'scale',
+                    options: '640:640:force_original_aspect_ratio=decrease'
+                }
+            ]);
+
+            // Video codec options
+            command.videoCodec('libx264')
+                .outputOptions([
+                    '-preset', 'fast',
+                    '-crf', '28',
+                    '-pix_fmt', 'yuv420p',
+                    '-movflags', '+faststart',
+                    '-t', '60'
+                ]);
+
+            // 🌿 Audio options - only if audio stream exists
+            if (hasAudio) {
+                command.audioCodec('aac')
+                    .audioBitrate('128k');
+            } else {
+                console.log('⚠️ No audio stream, encoding video-only');
+                command.noAudio();
+            }
+
+            // Execute
+            command.save(outputPath)
+                .on('start', (commandLine) => {
+                    // Silent - no spam
+                })
+                .on('stderr', (stderrLine) => {
+                    // Silent - no spam
+                })
+                .on('end', () => {
+                    resolve(outputPath);
+                })
+                .on('error', (err, stdout, stderr) => {
+                    console.error('❌ FFmpeg FAILED:', err.message);
+                    reject(err);
+                });
+        });
     });
 }
+
 
 /**
  * Convert audio file to Telegram Voice Message format (OGG Opus)

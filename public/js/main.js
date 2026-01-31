@@ -199,7 +199,125 @@ function setupEventListeners() {
 
     // Initialize Modal Logic (Close buttons etc)
     if (typeof initSettingsDialog === 'function') initSettingsDialog();
+    // 🌿 Header Click to Close (Mobile Only-ish behavior but safe for all)
+    const chatInfo = document.querySelector('.chat-info');
+    if (chatInfo) {
+        chatInfo.style.cursor = 'pointer';
+        chatInfo.addEventListener('click', () => {
+            if (state.selectedChatId) window.closeChat();
+        });
+    }
+
+    // 🌿 "Chats" Header Hard Reload
+    const chatsHeader = document.querySelector('.chat-list-header h2');
+    if (chatsHeader) {
+        chatsHeader.style.cursor = 'pointer';
+        chatsHeader.title = 'Reload App';
+        chatsHeader.addEventListener('click', () => {
+            console.log('🔄 Hard Reload triggered by header');
+            window.location.href = '/';
+        });
+    }
+
+    // 🌿 Swipe-to-Back Gesture (Interactive 1:1 Animation)
+    initSwipeGesture();
 }
+
+function initSwipeGesture() {
+    const messagesPanel = document.querySelector('.messages-panel');
+    const chatListPanel = document.querySelector('.chat-list-panel');
+    if (!messagesPanel || !chatListPanel) return;
+
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+    const threshold = window.innerWidth * 0.25; // 25% to trigger close
+
+    const onTouchStart = (e) => {
+        // Only active if chat is open (mobile-chat-active class)
+        if (!document.body.classList.contains('mobile-chat-active')) return;
+
+        // Ignore if starting from right edge (scrolling?) or handled by other elements
+        // But for "back", we usually swipe from left to right.
+        startX = e.touches[0].clientX;
+        isDragging = true;
+
+        // Disable transition during drag for 1:1 feel
+        messagesPanel.style.transition = 'none';
+        chatListPanel.style.transition = 'none';
+    };
+
+    const onTouchMove = (e) => {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX;
+
+        // Calculate delta (only positive i.e., swiping right)
+        let deltaX = currentX - startX;
+
+        if (deltaX < 0) deltaX = 0; // Prevent swiping left (further into chat)
+
+        // Apply transform
+        // Messages panel slides OUT to Right (0 -> 100vw)
+        messagesPanel.style.transform = `translateX(${deltaX}px)`;
+
+        // Chat list slides IN from Left (-30% -> 0)
+        // Ratio: deltaX / screenWidth
+        // Start: -30%, End: 0%
+        const screenW = window.innerWidth;
+        const progress = Math.min(deltaX / screenW, 1);
+        const listOffset = -30 + (progress * 30);
+        chatListPanel.style.transform = `translateX(${listOffset}%)`;
+    };
+
+    const onTouchEnd = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+
+        // Restore transition
+        messagesPanel.style.transition = 'transform 0.3s ease';
+        chatListPanel.style.transition = 'transform 0.3s ease';
+
+        // 🌿 FIX: Use changedTouches for correct lifting position
+        const endX = e.changedTouches[0].clientX;
+        const deltaX = endX - startX;
+
+        // 🌿 FIX: Lower threshold (15% instead of 25%)
+        const threshold = window.innerWidth * 0.15;
+
+        // Check threshold
+        if (deltaX > threshold) {
+            // Close Chat
+            window.closeChat();
+            // Clear inline styles after transition (let CSS take over)
+            setTimeout(() => {
+                messagesPanel.style.transform = '';
+                chatListPanel.style.transform = '';
+            }, 300);
+        } else {
+            // Snap Back (Keep Chat Open)
+            messagesPanel.style.transform = 'translateX(0)';
+            chatListPanel.style.transform = 'translateX(-30%)';
+            // Clear styles after snap
+            setTimeout(() => {
+                messagesPanel.style.transform = '';
+                chatListPanel.style.transform = '';
+            }, 300);
+        }
+    };
+
+    // Attach to message panel (or body/overlay)
+    // using passive: true for better scrolling performance, but we might need to block scroll if dragging horizontal?
+    // Let's rely on standard behavior: vertical scroll works, horizontal triggers this?
+    // Simple check: if deltaY > deltaX, ignore? 
+    // For now, let's attach to the panel edge (optional) or full panel. 
+    // Full panel might conflict with message horizontal scroll (code blocks).
+    // Let's attach to a "drag strip" or checks inside move.
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
+    document.addEventListener('touchend', onTouchEnd);
+}
+
 
 function switchView(view) {
     setState('currentView', view);
@@ -357,6 +475,9 @@ window.closeChat = function () {
 
     // Update URL to home
     history.pushState({}, '', '/chat');
+
+    // 🌿 Close Mobile View (Fix for swipe)
+    document.body.classList.remove('mobile-chat-active');
 
     // Re-render chat list view
     renderChatListView();
