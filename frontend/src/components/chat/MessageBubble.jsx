@@ -357,11 +357,27 @@ const normalizeReactions = (input) => {
     if (!input) return [];
 
     if (Array.isArray(input)) {
-        return input.map((r) => ({
-            emoji: r?.type?.emoji || r.emoji || r.reaction || r,
-            count: Number(r.count ?? r.total ?? r.total_count ?? 1),
-            me: Boolean(r.me || r.isMe || r.is_own)
-        })).filter(r => r.emoji);
+        return input.map((r) => {
+            let emoji = null;
+
+            // 1. Direct String (e.g. ['👍', '🔥'])
+            if (typeof r === 'string') emoji = r;
+            // 2. Standard Prop (My structure)
+            else if (r?.emoji && typeof r.emoji === 'string') emoji = r.emoji;
+            // 3. Nested Type (Telegram API)
+            else if (r?.type?.emoji && typeof r.type.emoji === 'string') emoji = r.type.emoji;
+            // 4. Nested Reaction
+            else if (r?.reaction) {
+                if (typeof r.reaction === 'string') emoji = r.reaction;
+                else if (r.reaction?.emoji && typeof r.reaction.emoji === 'string') emoji = r.reaction.emoji;
+            }
+
+            return {
+                emoji,
+                count: Number(r.count ?? r.total ?? r.total_count ?? 1),
+                me: Boolean(r.me || r.isMe || r.is_own)
+            };
+        }).filter(r => r.emoji);
     }
 
     if (typeof input === 'object') {
