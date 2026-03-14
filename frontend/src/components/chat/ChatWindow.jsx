@@ -39,6 +39,8 @@ const ChatWindow = ({ chatId, onBack }) => {
     const touchStartXRef = useRef(0);
     const isNearBottomRef = useRef(true);
     const prevChatIdRef = useRef(null);
+    const lastAtBottomChatIdRef = useRef(null);
+    const entryTimeRef = useRef(0);
     const [inputValue, setInputValue] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -413,24 +415,48 @@ const ChatWindow = ({ chatId, onBack }) => {
 
     useEffect(() => {
         const el = scrollRef.current;
-        if (!el) return;
+        if (!el || !messages) return;
 
+        const isNewChat = lastAtBottomChatIdRef.current !== chatId;
         const scrollToBottom = () => {
             el.scrollTop = el.scrollHeight;
         };
 
-        if (!loadingMoreRef.current && (isNearBottomRef.current || prevChatIdRef.current !== chatId)) {
+        // 🚬 Якщо це новий чат або ми були внизу - стрибаємо вниз
+        if (isNewChat || (isNearBottomRef.current && !loadingMoreRef.current)) {
             scrollToBottom();
-            const t1 = setTimeout(scrollToBottom, 50);
-            const t2 = setTimeout(scrollToBottom, 250);
-            prevChatIdRef.current = chatId;
-            return () => {
-                clearTimeout(t1);
-                clearTimeout(t2);
-            };
+            
+            if (isNewChat) {
+                lastAtBottomChatIdRef.current = chatId;
+                isNearBottomRef.current = true;
+                entryTimeRef.current = Date.now();
+                // Бек-ап на випадок важких рендерів
+                setTimeout(scrollToBottom, 50);
+                setTimeout(scrollToBottom, 500);
+            }
         }
-        prevChatIdRef.current = chatId;
     }, [messages?.length, chatId]);
+
+    // 🌿 Auto-Scroll on internal layout changes (images loading, etc)
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        const observer = new ResizeObserver(() => {
+            const isVeryRecent = Date.now() - entryTimeRef.current < 2500;
+            
+            // Якщо ми тільки зайшли (перші 2.5 сек) або юзер реально внизу - скролимо
+            if (!loadingMoreRef.current && (isNearBottomRef.current || isVeryRecent)) {
+                el.scrollTop = el.scrollHeight;
+                if (isVeryRecent) isNearBottomRef.current = true;
+            }
+        });
+
+        const inner = el.querySelector('.chat-thread-inner');
+        if (inner) observer.observe(inner);
+
+        return () => observer.disconnect();
+    }, [chatId]);
 
     useEffect(() => {
         setMessageLimit(50);

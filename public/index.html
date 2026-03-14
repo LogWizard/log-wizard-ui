@@ -14,8 +14,8 @@
   <meta name="apple-mobile-web-app-title" content="LogWizard">
   <link rel="apple-touch-icon" href="./vite.svg">
   <meta name="mobile-web-app-capable" content="yes">
-  <script type="module" crossorigin src="./assets/index-R5XGk6Ep.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-b9b745Vq.css">
+  <script type="module" crossorigin src="./assets/index-D7pdJp7m.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CqEnYGpm.css">
 </head>
 
 <body>
@@ -23,8 +23,9 @@
   <script>
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js', {
-        scope: '/GyS-Chats/'
+      const swPath = window.location.pathname.replace(/\/$/, '') + '/service-worker.js';
+      navigator.serviceWorker.register(swPath, {
+        scope: window.location.pathname
       }).then(reg => {
         console.log('📦 SW registered, scope:', reg.scope);
       }).catch(err => {

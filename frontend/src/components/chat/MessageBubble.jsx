@@ -31,7 +31,7 @@ const VoiceWaveform = ({ seed, progress }) => {
     );
 };
 
-const VoicePlayer = ({ url, duration, messageId, isMe }) => {
+const VoicePlayer = ({ url, duration, messageId, isMe, onError }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const audioRef = useRef(null);
@@ -48,7 +48,11 @@ const VoicePlayer = ({ url, duration, messageId, isMe }) => {
 
     return (
         <div className="flex items-center gap-3 min-w-[220px] p-2">
-            <audio ref={audioRef} src={url} onTimeUpdate={() => audioRef.current && setProgress(audioRef.current.currentTime / audioRef.current.duration)}
+            <audio 
+                ref={audioRef} 
+                src={url} 
+                onError={onError}
+                onTimeUpdate={() => audioRef.current && setProgress(audioRef.current.currentTime / audioRef.current.duration)}
                 onEnded={() => { setIsPlaying(false); setProgress(0); }} preload="metadata" />
             <button onClick={togglePlay} className="w-9 h-9 flex items-center justify-center rounded-full hover:opacity-80 shrink-0"
                 style={{ backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }}>
@@ -60,7 +64,7 @@ const VoicePlayer = ({ url, duration, messageId, isMe }) => {
     );
 };
 
-const VideoPlayer = ({ src, muted = false, loop = false, autoPlayIfShort = false }) => {
+const VideoPlayer = ({ src, muted = false, loop = false, autoPlayIfShort = false, onError }) => {
     const videoRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -110,6 +114,7 @@ const VideoPlayer = ({ src, muted = false, loop = false, autoPlayIfShort = false
                 ref={videoRef}
                 src={src}
                 className="media-video"
+                onError={onError}
                 onTimeUpdate={updateProgress}
                 onPause={() => setIsPlaying(false)}
                 onPlay={() => setIsPlaying(true)}
@@ -127,7 +132,7 @@ const VideoPlayer = ({ src, muted = false, loop = false, autoPlayIfShort = false
     );
 };
 
-const VideoNotePlayer = ({ src }) => {
+const VideoNotePlayer = ({ src, onError }) => {
     const videoRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -328,6 +333,7 @@ const VideoNotePlayer = ({ src }) => {
                         ref={videoRef}
                         src={src}
                         className="video-note-video"
+                        onError={onError}
                         onTimeUpdate={updateProgress}
                         onLoadedMetadata={handleLoaded}
                         onPause={() => setIsPlaying(false)}
@@ -349,7 +355,7 @@ const VideoNotePlayer = ({ src }) => {
 
 const fixMediaUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
+    if (url.startsWith('http') || url.startsWith('.') || url.startsWith('blob:')) return url;
     return url.startsWith('/') ? url : `/${url}`;
 };
 
@@ -418,12 +424,33 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
     const [photoSrc, setPhotoSrc] = useState(fixMediaUrl(message.url_photo || message.photo_url));
     const [videoUrl, setVideoUrl] = useState(fixMediaUrl(message.url_video || message.video?.url || message.url_animation || message.animation?.url));
     const [videoNoteUrl, setVideoNoteUrl] = useState(fixMediaUrl(message.url_video_note || message.video_note?.url));
-    const voiceSrc = fixMediaUrl(message.url_voice || message.voice?.url);
+    const [voiceUrl, setVoiceUrl] = useState(fixMediaUrl(message.url_voice || message.voice?.url));
 
-    const hasMedia = stickerSrc || photoSrc || voiceSrc || videoUrl || videoNoteUrl;
+    const hasMedia = stickerSrc || photoSrc || voiceUrl || videoUrl || videoNoteUrl;
+    const isLoadingMedia = (message.photo && !photoSrc) || ((message.video || message.animation) && !videoUrl) || (message.video_note && !videoNoteUrl) || (message.voice && !voiceUrl);
+
+    const mediaStyle = useMemo(() => {
+        let width = 0, height = 0;
+        if (message.photo?.length) {
+            const p = message.photo[message.photo.length - 1];
+            width = p.width; height = p.height;
+        } else if (message.video) {
+            width = message.video.width; height = message.video.height;
+        } else if (message.animation) {
+            width = message.animation.width; height = message.animation.height;
+        } else if (message.video_note) {
+            width = 1; height = 1;
+        }
+
+        if (width && height) {
+            return { '--aspect-ratio': `${width} / ${height}` };
+        }
+        return {};
+    }, [message]);
+
     const hasText = message.text && message.text.trim();
-    const mediaOnly = (stickerSrc || photoSrc || videoUrl || videoNoteUrl) && !hasText;
-    const voiceOnly = voiceSrc && !hasText;
+    const mediaOnly = (stickerSrc || photoSrc || videoUrl || videoNoteUrl || isLoadingMedia) && !hasText;
+    const voiceOnly = voiceUrl && !hasText;
     const isGif = Boolean(message.animation || message.is_gif || message.video?.is_gif || (photoSrc && /\.gif($|\?)/i.test(photoSrc)));
     const mediaNoBubble = !hasText && (stickerSrc || videoUrl || videoNoteUrl || isGif);
     const stickerIsVideo = Boolean(message.sticker?.is_video || (stickerSrc && /\.webm($|\?)/i.test(stickerSrc)));
@@ -538,7 +565,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
     };
 
     return (
-        <div className={clsx("message-row mb-3", isMe && "message-row--me")} onContextMenu={handleContextMenu}>
+        <div className={clsx("message-row mb-3", isMe && "message-row--me")} onContextMenu={handleContextMenu} data-message-id={message.message_id}>
             {/* Avatar */}
             {!isMe && (
                 <button
@@ -569,6 +596,33 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                 )}
             >
                 <div className="message-content">
+                    {/* Reply Block */}
+                    {message.reply_to_message && (
+                        <div
+                            className="message-reply"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const target = document.querySelector(`[data-message-id="${message.reply_to_message.message_id}"]`);
+                                if (target) {
+                                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    target.classList.add('message-highlight');
+                                    setTimeout(() => target.classList.remove('message-highlight'), 2000);
+                                }
+                            }}
+                        >
+                            <div className="message-reply-author">
+                                {message.reply_to_message.from?.first_name || 'User'}
+                            </div>
+                            <div className="message-reply-text">
+                                {message.reply_to_message.text ||
+                                    (message.reply_to_message.photo ? '📷 Фото' :
+                                        message.reply_to_message.video ? '📹 Відео' :
+                                            message.reply_to_message.sticker ? '💬 Стікер' :
+                                                message.reply_to_message.voice ? '🎤 Голосове' : 'Медіа')}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Author */}
                     {!isMe && message.from?.first_name && (
                         <div className="message-author" style={{ color: 'var(--accent-cyan)' }}>
@@ -577,8 +631,17 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                     )}
 
                     {/* Media */}
-                    {(stickerSrc || photoSrc || videoUrl || voiceSrc || videoNoteUrl) && (
+                    {(stickerSrc || photoSrc || videoUrl || voiceUrl || videoNoteUrl || isLoadingMedia) && (
                         <div className={clsx("message-media", mediaOnly && "message-media--only", videoNoteUrl && "message-media--note")}>
+                            {/* Loading Skeleton */}
+                            {isLoadingMedia && !stickerSrc && !photoSrc && !videoUrl && !videoNoteUrl && (
+                                <div className="message-media-skeleton animate-pulse" style={mediaStyle}>
+                                    <div className="flex flex-col items-center gap-2 opacity-30">
+                                        {(message.video || message.animation) ? <Play size={40} className="text-blue-400" /> : null}
+                                        <span className="text-sm font-medium">Курю медіа... 🌿</span>
+                                    </div>
+                                </div>
+                            )}
                             {stickerSrc && (
                                 stickerIsVideo ? (
                                     <video
@@ -588,9 +651,29 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                                         loop
                                         autoPlay
                                         playsInline
+                                        onError={() => {
+                                            const fileId = message.sticker?.file_id || message.animation?.file_id;
+                                            if (!fileId) return;
+                                            fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
+                                                .then((r) => r.ok ? r.json() : null)
+                                                .then((data) => data?.url && setStickerFallbackUrl(data.url))
+                                                .catch(() => { });
+                                        }}
                                     />
                                 ) : (
-                                    <img src={stickerSrc} alt="sticker" className="message-media-sticker" />
+                                    <img 
+                                        src={stickerSrc} 
+                                        alt="sticker" 
+                                        className="message-media-sticker" 
+                                        onError={() => {
+                                            const fileId = message.sticker?.file_id || message.animation?.file_id;
+                                            if (!fileId) return;
+                                            fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
+                                                .then((r) => r.ok ? r.json() : null)
+                                                .then((data) => data?.url && setStickerFallbackUrl(data.url))
+                                                .catch(() => { });
+                                        }}
+                                    />
                                 )
                             )}
 
@@ -599,11 +682,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                                     src={photoSrc}
                                     alt="photo"
                                     className="message-media-photo"
-                                    style={{
-                                        aspectRatio: message.photo?.length
-                                            ? `${message.photo[message.photo.length - 1].width} / ${message.photo[message.photo.length - 1].height}`
-                                            : undefined
-                                    }}
+                                    style={mediaStyle}
                                     onError={() => {
                                         const fileId = message.photo?.length ? message.photo[message.photo.length - 1].file_id : message.photo?.file_id;
                                         if (!fileId) return;
@@ -616,16 +695,52 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                             )}
 
                             {videoUrl && !stickerSrc && !photoSrc && (
-                                <VideoPlayer src={videoUrl} muted loop={isGif} autoPlayIfShort />
+                                <VideoPlayer
+                                    src={videoUrl}
+                                    muted
+                                    loop={isGif}
+                                    autoPlayIfShort
+                                    onError={() => {
+                                        const fileId = message.video?.file_id || message.animation?.file_id;
+                                        if (!fileId) return;
+                                        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
+                                            .then((r) => r.ok ? r.json() : null)
+                                            .then((data) => data?.url && setVideoUrl(data.url))
+                                            .catch(() => { });
+                                    }}
+                                />
                             )}
 
                             {videoNoteUrl && !stickerSrc && !photoSrc && !videoUrl && (
-                                <VideoNotePlayer src={videoNoteUrl} />
+                                <VideoNotePlayer
+                                    src={videoNoteUrl}
+                                    onError={() => {
+                                        const fileId = message.video_note?.file_id;
+                                        if (!fileId) return;
+                                        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
+                                            .then((r) => r.ok ? r.json() : null)
+                                            .then((data) => data?.url && setVideoNoteUrl(data.url))
+                                            .catch(() => { });
+                                    }}
+                                />
                             )}
 
-                            {voiceSrc && !hasText && (
+                            {voiceUrl && !hasText && (
                                 <div className="message-media-voice">
-                                    <VoicePlayer url={voiceSrc} duration={message.voice?.duration} messageId={message.message_id} isMe={isMe} />
+                                    <VoicePlayer
+                                        url={voiceUrl}
+                                        duration={message.voice?.duration}
+                                        messageId={message.message_id}
+                                        isMe={isMe}
+                                        onError={() => {
+                                            const fileId = message.voice?.file_id;
+                                            if (!fileId) return;
+                                            fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
+                                                .then((r) => r.ok ? r.json() : null)
+                                                .then((data) => data?.url && setVoiceUrl(data.url))
+                                                .catch(() => { });
+                                        }}
+                                    />
                                 </div>
                             )}
                         </div>

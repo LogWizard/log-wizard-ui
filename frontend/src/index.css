@@ -307,9 +307,9 @@ body {
   position: relative;
   border-radius: 16px;
   box-shadow: var(--shadow-soft);
-  width: clamp(240px, 34vw, 45vw);
-  max-width: 45vw;
-  min-width: 80px;
+  width: clamp(280px, 35vw, 450px);
+  max-width: 450px;
+  min-width: 250px;
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -401,6 +401,41 @@ body {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.2px;
+  margin-bottom: 2px;
+}
+
+.message-reply {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 4px 8px 8px 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.message-reply:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.message-reply-author {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-reply-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
 .message-media {
@@ -421,15 +456,24 @@ body {
 }
 
 .message-media-photo,
-.message-media-video {
+.message-media-video,
+.message-media-skeleton {
   width: 100%;
   max-width: 100%;
-  min-height: 180px;
-  background: rgba(255, 255, 255, 0.03);
+  aspect-ratio: var(--aspect-ratio, 16/9);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   display: block;
   border: 1px solid var(--border-subtle);
-  aspect-ratio: attr(width) / attr(height);
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+.message-media-skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
 }
 
 .message-media-sticker {
@@ -520,7 +564,9 @@ body {
 .media-video {
   width: 100%;
   height: auto;
+  max-height: 70vh;
   display: block;
+  object-fit: contain;
 }
 
 /* removed media video play overlay */
@@ -1009,4 +1055,18 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.message-highlight {
+  animation: highlightMessage 2s ease-out;
+}
+
+@keyframes highlightMessage {
+  0% {
+    background: rgba(91, 140, 255, 0.4);
+    border-radius: 12px;
+  }
+  100% {
+    background: transparent;
+  }
 }

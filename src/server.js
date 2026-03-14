@@ -80,18 +80,27 @@ const getUserDbPool = async () => {
     return userDbPool;
 };
 
-const getFileUrlById = async (fileId) => {
+const getFileUrlById = async (fileId, updateDb = false) => {
     if (!BOT_TOKEN || !fileId) return null;
     try {
-        const fileRes = await fetch(`${TELEGRAM_API}/getFile`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_id: fileId })
-        });
-        const fileData = await fileRes.json();
-        const filePath = fileData?.result?.file_path;
-        if (!filePath) return null;
-        return `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+        // 🌿 NEW LOGIC: Return RELATIVE proxy URL
+        const url = `./api/tg-media/${fileId}`;
+
+        // 🌿 Live Caching: Update DB if requested
+        if (updateDb) {
+            const pool = getPool();
+            if (pool) {
+                const searchPattern = `%${fileId}%`;
+                await pool.query(
+                    `UPDATE messages 
+                     SET media_url = ? 
+                     WHERE raw_data LIKE ?`,
+                    [url, searchPattern]
+                ).catch(e => console.error('Live DB update error:', e.message));
+            }
+        }
+
+        return url;
     } catch (e) {
         return null;
     }
@@ -280,12 +289,69 @@ export async function createMessageServer() {
     app.post('/api/send-voice-note', sendVoiceNote);
     app.post('/api/set-reaction', setReaction);
 
-    // 🌿 File URL Resolver
+    // 🌿 File URL Resolver (with Live Parsing & Caching)
     app.get('/api/file-url/:fileId', async (req, res) => {
         const { fileId } = req.params;
-        const url = await getFileUrlById(fileId);
+        // Returns the proxy URL and updates DB
+        const url = await getFileUrlById(fileId, true);
         if (!url) return res.status(404).json({ error: 'File not found' });
         res.json({ url });
+    });
+
+    // 🌿 Generic Media Proxy / Cache (The Real Fix! 🚬🌿)
+    app.get('/api/tg-media/:fileId', async (req, res) => {
+        const { fileId } = req.params;
+        const mediaDir = path.join(appDirectory, 'public', 'tg-media');
+        
+        try {
+            if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+
+            // 1. Check for cached file (exact match before extension)
+            const files = fs.readdirSync(mediaDir);
+            const cachedFile = files.find(f => {
+                const parts = f.split('.');
+                return parts[0] === fileId;
+            });
+            
+            if (cachedFile) {
+                // console.log(`📦 Serving cached media ${fileId}`);
+                return res.sendFile(path.join(mediaDir, cachedFile));
+            }
+
+            // 2. Not cached -> Fetch fresh Path from Telegram
+            if (!BOT_TOKEN) return res.status(500).send('Bot token missing');
+
+            const pathResp = await fetch(`${TELEGRAM_API}/getFile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_id: fileId })
+            });
+            const pathData = await pathResp.json();
+
+            if (!pathData.ok || !pathData.result?.file_path) {
+                return res.status(404).send('File not found in TG');
+            }
+
+            const filePath = pathData.result.file_path;
+            const ext = path.extname(filePath);
+            const localPath = path.join(mediaDir, `${fileId}${ext}`);
+            const tgUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+
+            // 3. Download & Save
+            console.log(`📥 Downloading media to storage: ${fileId}${ext}`);
+            const mediaResp = await fetch(tgUrl);
+            if (!mediaResp.ok) throw new Error(`TG Download failed: ${mediaResp.status}`);
+
+            const buffer = await mediaResp.arrayBuffer();
+            fs.writeFileSync(localPath, Buffer.from(buffer));
+
+            // 4. Serve
+            res.sendFile(localPath);
+
+        } catch (error) {
+            console.error('Media Proxy Error:', error.message);
+            res.status(500).send(error.message);
+        }
     });
 
     // 🌿 User profile from DB
@@ -942,6 +1008,9 @@ export async function createMessageServer() {
     // 🌿 Static Files (Avatars) - Serve cached avatars
     app.use('/avatars', express.static(path.join(appDirectory, 'public', 'avatars')));
 
+    // 🌿 Static Files (TG Media Cache) 🚬🌿
+    app.use('/tg-media', express.static(path.join(appDirectory, 'public', 'tg-media')));
+
     // 🌿 Static Files (Uploads) - Fixes 404 & Encoding issues automatically
     app.use('/uploads', express.static(path.join(appDirectory, 'public', 'uploads')));
 
@@ -1080,14 +1149,8 @@ export async function createMessageServer() {
         return obj;
     }
     async function getFileUrl(token, fileId) {
-        const response = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
-        const json = await response.json();
-        if (json.ok && json.result && json.result.file_path) {
-            const fileUrl = `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
-            return fileUrl;
-        } else {
-            throw new Error('Failed to get file URL');
-        }
+        // 🌿 NEW LOGIC: Return RELATIVE proxy URL
+        return `./api/tg-media/${fileId}`;
     }
     async function getBotTokenFromLink(link) {
         if (link) {

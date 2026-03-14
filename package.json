@@ -5,7 +5,7 @@
   "main": "./index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "npm run build && node index.js",
     "dev": "nodemon index.js --ignore config.json --ignore config/",
     "dev:all": "concurrently -n api,ui -c magenta,cyan \"npm run dev\" \"npm --prefix frontend run dev -- --host\"",
     "build": "npm --prefix frontend run build"
