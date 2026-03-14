@@ -6,6 +6,8 @@ import cors_proxy from 'cors-anywhere';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import express from 'express';
+import cookieParser from 'cookie-parser';
+import { createSsoMiddleware } from '../../sso-auth-service/src/middlewares/ssoMiddleware.mjs';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import { ConfigManager } from './config-manager.js';
@@ -96,6 +98,11 @@ const getFileUrlById = async (fileId) => {
 };
 
 app.use(express.json());
+app.use(cookieParser());
+
+// SSO Guard — тепер НАД всім, щоб захистити UI
+app.use(createSsoMiddleware(['/api', '/status', '/avatars', '/api/avatar-image', '/manifest.json', '/favicon.ico', '/assets', '/js'], { proxyPrefix: '/GyS-Chats' }));
+
 async function readConfigPrams() { return configManager.read(); }
 const getIPv4FromIPV6 = (ipAddress) => {
     const ipv6Pattern = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
@@ -543,8 +550,8 @@ export async function createMessageServer() {
                 if (row.from_photo_url && row.from_photo_url !== 'none' && msg.from.id) {
                     const avatarPath = path.join(appDirectory, 'public', 'avatars', `${msg.from.id}.jpg`);
                     msg.from.photo_url = fs.existsSync(avatarPath)
-                        ? `/avatars/${msg.from.id}.jpg`
-                        : `/api/avatar-image/${msg.from.id}`;
+                        ? `./avatars/${msg.from.id}.jpg`
+                        : `./api/avatar-image/${msg.from.id}`;
                 } else {
                     msg.from.photo_url = 'none';
                 }
@@ -641,7 +648,7 @@ export async function createMessageServer() {
                     // Private chat - check if we have cached avatar first
                     const avatarPath = path.join(appDirectory, 'public', 'avatars', `${chat.id}.jpg`);
                     if (fs.existsSync(avatarPath)) {
-                        photoUrl = `/avatars/${chat.id}.jpg`; // 🌿 Direct cached path
+                        photoUrl = `./avatars/${chat.id}.jpg`; // 🌿 Direct cached path
                     } else {
                         // Check DB to see if we should try fetching
                         const [userRows] = await pool.query(`
@@ -649,7 +656,7 @@ export async function createMessageServer() {
                         `, [chat.id]);
 
                         if (userRows && userRows.length > 0 && userRows[0].photo_url && userRows[0].photo_url !== 'none') {
-                            photoUrl = `/api/avatar-image/${chat.id}`; // 🌿 Will trigger caching on first load
+                            photoUrl = `./api/avatar-image/${chat.id}`; // 🌿 Will trigger caching on first load
                         }
                     }
                 }

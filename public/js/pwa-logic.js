@@ -35,10 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Register Service Worker
+    // Register Service Worker (scoped to /GyS-Chats/ to avoid conflicts with other PWAs)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js')
+            navigator.serviceWorker.register('./service-worker.js', {
+                scope: '/GyS-Chats/'
+            })
                 .then(registration => {
                     console.log('🌿 ServiceWorker registration successful with scope: ', registration.scope);
                 }, err => {

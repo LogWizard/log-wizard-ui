@@ -1,9 +1,9 @@
-const CACHE_NAME = 'log-wizard-v1';
+const CACHE_NAME = 'log-wizard-v3';
 const ASSETS = [
-    '/',
-    '/index.html',
-    '/css/styles-dark.css',
-    '/js/main.js'
+    './',
+    './index.html',
+    './manifest.json',
+    './vite.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -26,7 +26,10 @@ self.addEventListener('fetch', (event) => {
     if (event.request.mode === 'navigate') {
         event.respondWith(
             fetch(event.request).catch(() => {
-                return caches.match('/index.html');
+                // Try caching fallback with current location base path
+                return caches.match('./index.html').then(response => {
+                    return response || fetch('./index.html');
+                });
             })
         );
     }

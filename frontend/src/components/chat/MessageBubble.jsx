@@ -435,7 +435,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
             setPhotoSrc(fileUrlCache.get(fileId));
             return;
         }
-        fetch(`/api/file-url/${encodeURIComponent(fileId)}`)
+        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
                 if (data?.url) {
@@ -453,7 +453,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
             setVideoUrl(fileUrlCache.get(fileId));
             return;
         }
-        fetch(`/api/file-url/${encodeURIComponent(fileId)}`)
+        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
                 if (data?.url) {
@@ -471,7 +471,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
             setVideoNoteUrl(fileUrlCache.get(fileId));
             return;
         }
-        fetch(`/api/file-url/${encodeURIComponent(fileId)}`)
+        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
                 if (data?.url) {
@@ -489,7 +489,7 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
             setStickerFallbackUrl(fileUrlCache.get(fileId));
             return;
         }
-        fetch(`/api/file-url/${encodeURIComponent(fileId)}`)
+        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
                 if (data?.url) {
@@ -599,10 +599,15 @@ const MessageBubble = ({ message, fallbackAvatarUrl, fallbackAvatarName, onOpenM
                                     src={photoSrc}
                                     alt="photo"
                                     className="message-media-photo"
+                                    style={{
+                                        aspectRatio: message.photo?.length
+                                            ? `${message.photo[message.photo.length - 1].width} / ${message.photo[message.photo.length - 1].height}`
+                                            : undefined
+                                    }}
                                     onError={() => {
                                         const fileId = message.photo?.length ? message.photo[message.photo.length - 1].file_id : message.photo?.file_id;
                                         if (!fileId) return;
-                                        fetch(`/api/file-url/${encodeURIComponent(fileId)}`)
+                                        fetch(`./api/file-url/${encodeURIComponent(fileId)}`)
                                             .then((r) => r.ok ? r.json() : null)
                                             .then((data) => data?.url && setPhotoSrc(data.url))
                                             .catch(() => { });

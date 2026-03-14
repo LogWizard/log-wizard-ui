@@ -1,6 +1,6 @@
 
 export const fetchChats = async (includeArchive = false) => {
-    const response = await fetch(`/api/get-all-chats?include_archive=${includeArchive ? 'true' : 'false'}`);
+    const response = await fetch(`./api/get-all-chats?include_archive=${includeArchive ? 'true' : 'false'}`);
     if (!response.ok) {
         throw new Error('Network response was not ok');
     }
@@ -9,7 +9,7 @@ export const fetchChats = async (includeArchive = false) => {
 
 export const fetchMessages = async (chatId, limit = 50, includeArchive = false) => {
     if (!chatId) return [];
-    const response = await fetch(`/messages?group=${chatId}&limit=${limit}&include_archive=${includeArchive ? 'true' : 'false'}`);
+    const response = await fetch(`./messages?group=${chatId}&limit=${limit}&include_archive=${includeArchive ? 'true' : 'false'}`);
     if (!response.ok) {
         throw new Error('Network response was not ok');
     }
@@ -17,7 +17,7 @@ export const fetchMessages = async (chatId, limit = 50, includeArchive = false) 
 };
 
 export const sendMessage = async (chatId, text) => {
-    const response = await fetch('/api/send-message', {
+    const response = await fetch('./api/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text })
@@ -33,7 +33,7 @@ export const uploadFile = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/upload', {
+    const response = await fetch('./api/upload', {
         method: 'POST',
         body: formData
     });
@@ -46,7 +46,7 @@ export const uploadFile = async (file) => {
 };
 
 export const sendPhoto = async (chatId, photoUrl, caption = '') => {
-    const response = await fetch('/api/send-photo', {
+    const response = await fetch('./api/send-photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, photo: photoUrl, caption })
@@ -56,7 +56,7 @@ export const sendPhoto = async (chatId, photoUrl, caption = '') => {
 };
 
 export const sendVideo = async (chatId, videoUrl, caption = '') => {
-    const response = await fetch('/api/send-video', {
+    const response = await fetch('./api/send-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, video: videoUrl, caption })
@@ -66,7 +66,7 @@ export const sendVideo = async (chatId, videoUrl, caption = '') => {
 };
 
 export const sendAudio = async (chatId, audioUrl, isVoice = false) => {
-    const endpoint = isVoice ? '/api/send-voice' : '/api/send-audio';
+    const endpoint = isVoice ? './api/send-voice' : './api/send-audio';
     const payload = isVoice ? { chat_id: chatId, voice: audioUrl } : { chat_id: chatId, audio: audioUrl };
     const response = await fetch(endpoint, {
         method: 'POST',
@@ -78,7 +78,7 @@ export const sendAudio = async (chatId, audioUrl, isVoice = false) => {
 };
 
 export const sendSticker = async (chatId, stickerUrl) => {
-    const response = await fetch('/api/send-sticker', {
+    const response = await fetch('./api/send-sticker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, sticker: stickerUrl })
@@ -88,19 +88,19 @@ export const sendSticker = async (chatId, stickerUrl) => {
 };
 
 export const fetchStickerSets = async () => {
-    const response = await fetch('/api/sticker-sets');
+    const response = await fetch('./api/sticker-sets');
     if (!response.ok) throw new Error('Failed to load sticker sets');
     return response.json();
 };
 
 export const fetchStickerSet = async (name) => {
-    const response = await fetch(`/api/sticker-sets/${encodeURIComponent(name)}`);
+    const response = await fetch(`./api/sticker-sets/${encodeURIComponent(name)}`);
     if (!response.ok) throw new Error('Failed to load sticker set');
     return response.json();
 };
 
 export const sendVoiceNote = async (chatId, voiceNoteUrl, caption = '') => {
-    const response = await fetch('/api/send-voice-note', {
+    const response = await fetch('./api/send-voice-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, voice_note: voiceNoteUrl, caption })
@@ -110,7 +110,7 @@ export const sendVoiceNote = async (chatId, voiceNoteUrl, caption = '') => {
 };
 
 export const sendVideoNote = async (chatId, videoNoteUrl) => {
-    const response = await fetch('/api/send-video-note', {
+    const response = await fetch('./api/send-video-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, video_note: videoNoteUrl })
@@ -120,13 +120,13 @@ export const sendVideoNote = async (chatId, videoNoteUrl) => {
 };
 
 export const getManualMode = async (chatId) => {
-    const response = await fetch(`/api/get-manual-mode?chat_id=${chatId}`);
+    const response = await fetch(`./api/get-manual-mode?chat_id=${chatId}`);
     if (!response.ok) throw new Error('Failed to load manual mode');
     return response.json();
 };
 
 export const setManualMode = async (chatId, enabled) => {
-    const response = await fetch('/api/set-manual-mode', {
+    const response = await fetch('./api/set-manual-mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, enabled })
@@ -136,7 +136,7 @@ export const setManualMode = async (chatId, enabled) => {
 };
 
 export const setReaction = async (chatId, messageId, emoji, action = 'add') => {
-    const response = await fetch('/api/set-reaction', {
+    const response = await fetch('./api/set-reaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, message_id: messageId, emoji, action })
@@ -146,7 +146,7 @@ export const setReaction = async (chatId, messageId, emoji, action = 'add') => {
 };
 
 export const deleteMessage = async (chatId, messageId) => {
-    const response = await fetch('/api/delete-message', {
+    const response = await fetch('./api/delete-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, message_id: messageId })
@@ -156,7 +156,7 @@ export const deleteMessage = async (chatId, messageId) => {
 };
 
 export const editMessage = async (chatId, messageId, text, isCaption = false) => {
-    const response = await fetch('/api/edit-message', {
+    const response = await fetch('./api/edit-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, is_caption: isCaption })
@@ -168,7 +168,7 @@ export const editMessage = async (chatId, messageId, text, isCaption = false) =>
 export const refreshMediaUrl = async (fileId) => {
     // 🌿 Auto-refresh media link logic (hypothetical endpoint based on user request)
     try {
-        const response = await fetch(`/api/refresh-file-url?file_id=${fileId}`);
+        const response = await fetch(`./api/refresh-file-url?file_id=${fileId}`);
         if (!response.ok) return null;
         const data = await response.json();
         return data.url; // Assuming backend returns { url: "..." }
@@ -180,7 +180,7 @@ export const refreshMediaUrl = async (fileId) => {
 
 export const fetchUserProfile = async (userId) => {
     if (!userId) return null;
-    const response = await fetch(`/api/user/${encodeURIComponent(userId)}`);
+    const response = await fetch(`./api/user/${encodeURIComponent(userId)}`);
     if (!response.ok) throw new Error('Failed to load user profile');
     return response.json();
 };
