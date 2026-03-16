@@ -121,3 +121,4 @@ verify_migration.js
 
 # Build output
 frontend/dist/
+public/tg-media*
