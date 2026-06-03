@@ -1,6 +1,7 @@
 
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 dotenv.config();
 
 // Configuration 🌿
@@ -24,7 +25,7 @@ async function attemptConnection(config) {
 }
 
 export async function initDB() {
-    console.log('🔌 Connecting to MariaDB...', { host: dbConfig.host, port: dbConfig.port, user: dbConfig.user });
+    logInfo('🔌 Connecting to MariaDB...', { host: dbConfig.host, port: dbConfig.port, user: dbConfig.user });
 
     let connection = null;
 
@@ -33,18 +34,18 @@ export async function initDB() {
 
     // 2. If failed and password was empty, try 'root'
     if (!connection && !dbConfig.password) {
-        console.warn('⚠️ Connection failed with empty password. Trying "root"...');
+        logWarn('⚠️ Connection failed with empty password. Trying "root"...');
         connection = await attemptConnection({ ...dbConfig, password: 'root', database: undefined });
         if (connection) dbConfig.password = 'root'; // Update config
     }
 
     if (!connection) {
-        console.error('❌ Database Connection Failed! Please check your credentials and port (3307).');
+        logError('❌ Database Connection Failed! Please check your credentials and port (3307).');
         return null;
     }
 
     try {
-        console.log('✨ Connected! Checking database...');
+        logInfo('✨ Connected! Checking database...');
 
         // 2. Create Database if not exists
         await connection.query(`CREATE DATABASE IF NOT EXISTS log_wizard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
@@ -62,11 +63,11 @@ export async function initDB() {
         // 4. Init Tables
         await createTables();
 
-        console.log('✅ Database initialized successfully.');
+        logInfo('✅ Database initialized successfully.');
         return pool;
 
     } catch (error) {
-        console.error('❌ Database Init Error:', error.message);
+        logError('❌ Database Init Error:', error.message);
         return null;
     }
 }
@@ -125,7 +126,7 @@ async function createTables() {
         await pool.query(`CREATE INDEX idx_last_avatar_check ON users(last_avatar_check)`);
     } catch (e) { /* Index exists */ }
 
-    console.log('✅ Avatar caching schema ready');
+    logInfo('✅ Avatar caching schema ready');
 
     // 3. Chats Table
     await pool.query(`
@@ -185,7 +186,7 @@ export async function runArchiveMigration() {
         const count = countRes[0].count;
 
         if (count > 0) {
-            console.log(`📦 Archiving ${count} old messages (before ${cutoffDate})...`);
+            logInfo(`📦 Archiving ${count} old messages (before ${cutoffDate})...`);
 
             // 1. Move to Archive
             await pool.query(`
@@ -198,13 +199,13 @@ export async function runArchiveMigration() {
                 DELETE FROM messages WHERE date < ?
             `, [cutoffDate]);
 
-            console.log('✅ Archive Complete! Clutter removed.');
+            logInfo('✅ Archive Complete! Clutter removed.');
         } else {
-            // console.log('📦 Archive check: Clean.');
+            // logInfo('📦 Archive check: Clean.');
         }
 
     } catch (e) {
-        console.error('Archive Error:', e);
+        logError('Archive Error:', e);
     }
 
     // Seed default sets ALWAYS if they are missing
@@ -220,22 +221,22 @@ export async function runArchiveMigration() {
         try {
             await pool.query('INSERT INTO sticker_sets (name, title) VALUES (?, ?) ON DUPLICATE KEY UPDATE is_active = 1', [set, set]);
         } catch (e) {
-            console.error('Seed Error:', e.message);
+            logError('Seed Error:', e.message);
         }
     }
-    console.log('🌱 Seeded sticker sets.');
+    logInfo('🌱 Seeded sticker sets.');
 }
 
 export async function getStickerSets() {
     if (!pool) {
-        console.warn('⚠️ DB Pool not ready for getStickerSets');
+        logWarn('⚠️ DB Pool not ready for getStickerSets');
         return [];
     }
     try {
         const [rows] = await pool.query('SELECT * FROM sticker_sets WHERE is_active = 1 ORDER BY id DESC'); // Newest first
         return rows;
     } catch (e) {
-        console.error('DB Select Error:', e);
+        logError('DB Select Error:', e);
         return [];
     }
 }
@@ -246,7 +247,7 @@ export async function addStickerSet(name, title) {
         await pool.query('INSERT INTO sticker_sets (name, title) VALUES (?, ?) ON DUPLICATE KEY UPDATE is_active = 1', [name, title || name]);
         return true;
     } catch (e) {
-        console.error('DB Insert Error:', e);
+        logError('DB Insert Error:', e);
         throw e;
     }
 }

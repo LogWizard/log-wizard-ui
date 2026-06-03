@@ -1,51 +1,52 @@
 
 import { initDB, getPool } from '../services/db.js';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 async function forceArchive() {
-    console.log('🚀 Starting Force Archive...');
+    logInfo('🚀 Starting Force Archive...');
 
     // Initialize DB Connection
     await initDB();
     const pool = getPool();
 
     if (!pool) {
-        console.error('❌ Failed to connect to DB');
+        logError('❌ Failed to connect to DB');
         process.exit(1);
     }
 
     try {
         const cutoffDate = '2026-01-19 01:00:00';
-        console.log(`📅 Cutoff Date: ${cutoffDate}`);
+        logInfo(`📅 Cutoff Date: ${cutoffDate}`);
 
         // 1. Check Candidates
         const [rows] = await pool.query(`SELECT COUNT(*) as count FROM messages WHERE date < ?`, [cutoffDate]);
         const count = rows[0].count;
-        console.log(`📊 Found ${count} messages to archive.`);
+        logInfo(`📊 Found ${count} messages to archive.`);
 
         if (count === 0) {
-            console.log('✨ Nothing to archive. DB is clean.');
+            logInfo('✨ Nothing to archive. DB is clean.');
             process.exit(0);
         }
 
         // 2. Insert into Archive
-        console.log('📦 Copying to archive...');
+        logInfo('📦 Copying to archive...');
         const [copyRes] = await pool.query(`
             INSERT IGNORE INTO messages_archive 
             SELECT * FROM messages WHERE date < ?
         `, [cutoffDate]);
-        console.log(`✅ Copied ${copyRes.affectedRows} rows.`);
+        logInfo(`✅ Copied ${copyRes.affectedRows} rows.`);
 
         // 3. Delete from Main
-        console.log('🔥 Deleting from main table...');
+        logInfo('🔥 Deleting from main table...');
         const [delRes] = await pool.query(`
             DELETE FROM messages WHERE date < ?
         `, [cutoffDate]);
-        console.log(`✅ Deleted ${delRes.affectedRows} rows.`);
+        logInfo(`✅ Deleted ${delRes.affectedRows} rows.`);
 
-        console.log('🎉 Archive Migration Complete!');
+        logInfo('🎉 Archive Migration Complete!');
 
     } catch (e) {
-        console.error('❌ Error during archive:', e);
+        logError('❌ Error during archive:', e);
     } finally {
         process.exit(0);
     }

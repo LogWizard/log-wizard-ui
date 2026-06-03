@@ -20,6 +20,7 @@ import { initDB, getPool, getStickerSets, addStickerSet } from './services/db.js
 import { MessageSyncer } from './services/sync-service.js'; // 🌿 Sync Service
 import { AvatarService } from './services/avatar-service.js'; // 🌿 Avatar Service
 import fetch from 'node-fetch'; // Ensure fetch is available
+import { logInfo, logWarn, logError } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,11 +51,11 @@ const getUserDbPool = async () => {
     const database = process.env.BOTDB_NAME || process.env.USER_DB_NAME || process.env.DB_NAME;
 
     if (!host || !user || !database) {
-        console.warn('⚠️ Bot DB not configured (missing BOTDB_HOST/USER/NAME)');
+        logWarn('⚠️ Bot DB not configured (missing BOTDB_HOST/USER/NAME)');
         return null;
     }
 
-    console.log('🌿 Connecting to Bot DB...', { host, port, user, database });
+    logInfo('🌿 Connecting to Bot DB...', { host, port, user, database });
 
     try {
         userDbPool = mysql.createPool({
@@ -70,9 +71,9 @@ const getUserDbPool = async () => {
         // Test connection
         const conn = await userDbPool.getConnection();
         conn.release();
-        console.log('✅ Bot DB connected successfully!');
+        logInfo('✅ Bot DB connected successfully!');
     } catch (err) {
-        console.error('❌ Bot DB connection failed:', err.message);
+        logError('❌ Bot DB connection failed:', err.message);
         userDbPool = null;
         return null;
     }
@@ -96,7 +97,7 @@ const getFileUrlById = async (fileId, updateDb = false) => {
                      SET media_url = ? 
                      WHERE raw_data LIKE ?`,
                     [url, searchPattern]
-                ).catch(e => console.error('Live DB update error:', e.message));
+                ).catch(e => logError('Live DB update error:', e.message));
             }
         }
 
@@ -145,9 +146,10 @@ export async function createMessageServer() {
         corsServerPort = params['corsServerPort'] ? params['corsServerPort'] : '3004';
     } else {
         const paramsOnConfig = await readConfigPrams();
-        port = paramsOnConfig['Listening Port'];
-        MSG_PATH = paramsOnConfig['Listening Path'];
-        corsServerPort = paramsOnConfig['Cors Server Port'];
+        // Environment variables override config (for Docker)
+        port = process.env.LISTEN_PORT || paramsOnConfig['Listening Port'];
+        MSG_PATH = process.env.MSG_PATH || paramsOnConfig['Listening Path'];
+        corsServerPort = process.env.CORS_PORT || paramsOnConfig['Cors Server Port'];
     }
 
     /* 🌿 CORS Anywhere disabled - not needed anymore
@@ -156,7 +158,7 @@ export async function createMessageServer() {
         requireHeader: ['origin', 'x-requested-with'],
         removeHeaders: ['cookie', 'cookie2']
     }).listen(corsServerPort, function () {
-        console.log(`Server CORS Anywhere started on port ${corsServerPort}`);
+        logInfo(`Server CORS Anywhere started on port ${corsServerPort}`);
     });
     */
 
@@ -166,7 +168,7 @@ export async function createMessageServer() {
     if (MSG_PATH) {
         // 🌿 Disabled Sync as user requested (using Direct DB now)
         // const syncer = new MessageSyncer(MSG_PATH);
-        // syncer.start().catch(e => console.error('Sync error:', e));
+        // syncer.start().catch(e => logError('Sync error:', e));
 
         const avatarService = new AvatarService(appDirectory);
         avatarService.start();
@@ -233,7 +235,7 @@ export async function createMessageServer() {
 
             refreshOffset += refreshBatchSize;
         } catch (e) {
-            console.error('Media URL refresh error:', e.message);
+            logError('Media URL refresh error:', e.message);
         }
     };
 
@@ -253,9 +255,9 @@ export async function createMessageServer() {
                     response.groups = directories;
                 }
             })
-            .catch((error) => console.error('getSettingsApi: ' + error));
+            .catch((error) => logError('getSettingsApi: ' + error));
 
-        console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} POST`);
+        logInfo(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} POST`);
 
         res.status(200).send(response);
     });
@@ -263,7 +265,7 @@ export async function createMessageServer() {
         const data = req.body;
         const selectedDate = formatDate(data.Date) ? formatDate(data.Date) : new Date().toLocaleDateString('uk-UA');
         const ipAddress = getIPv4FromIPV6(req.header('x-forwarded-for') || req.socket.remoteAddress);
-        // console.log(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
+        // logInfo(`Received ${getOSFromUA(req.headers['user-agent'])} request for ${logStr}${req.headers.host}${req.url} || ${ipAddress} POST\nbody:\n${JSON.stringify(data, null, 2)}`);
         writeConfigPrams(data);
         if (data['Listening Path']) {
             folderPath = path.join(data['Listening Path'], selectedDate);
@@ -314,7 +316,7 @@ export async function createMessageServer() {
             });
             
             if (cachedFile) {
-                // console.log(`📦 Serving cached media ${fileId}`);
+                // logInfo(`📦 Serving cached media ${fileId}`);
                 return res.sendFile(path.join(mediaDir, cachedFile));
             }
 
@@ -338,7 +340,7 @@ export async function createMessageServer() {
             const tgUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
 
             // 3. Download & Save
-            console.log(`📥 Downloading media to storage: ${fileId}${ext}`);
+            logInfo(`📥 Downloading media to storage: ${fileId}${ext}`);
             const mediaResp = await fetch(tgUrl);
             if (!mediaResp.ok) throw new Error(`TG Download failed: ${mediaResp.status}`);
 
@@ -349,7 +351,7 @@ export async function createMessageServer() {
             res.sendFile(localPath);
 
         } catch (error) {
-            console.error('Media Proxy Error:', error.message);
+            logError('Media Proxy Error:', error.message);
             res.status(500).send(error.message);
         }
     });
@@ -380,7 +382,7 @@ export async function createMessageServer() {
                         });
                     }
                 } catch (e) {
-                    console.error('User DB query error:', e.message);
+                    logError('User DB query error:', e.message);
                 }
             }
 
@@ -639,7 +641,7 @@ export async function createMessageServer() {
             res.json(messages);
 
         } catch (err) {
-            console.error(`DB Message Error: ${err}`);
+            logError(`DB Message Error: ${err}`);
             res.status(500).json({ message: 'Internal Server Error' });
         }
     });
@@ -741,7 +743,7 @@ export async function createMessageServer() {
             // Filter out nulls (hidden chats)
             res.json(chatsWithLastMsg.filter(c => c !== null));
         } catch (e) {
-            console.error('API Error:', e);
+            logError('API Error:', e);
             res.status(500).json([]);
         }
     });
@@ -754,16 +756,16 @@ export async function createMessageServer() {
             const stats = await statsService.generateStats(days);
             res.json(stats);
         } catch (e) {
-            console.error('Stats Error:', e);
+            logError('Stats Error:', e);
             res.status(500).json({ error: e.message });
         }
     });
 
     /* Цей роутер відповідає за обробку запиту /chat */
     app.get('/chat', async (req, res) => {
-        // console.log(__dirname); // 🌿 Removed verbose logging
+        // logInfo(__dirname); // 🌿 Removed verbose logging
         const filePath = path.join(appDirectory, '/public/index.html');
-        // console.log(filePath); // 🌿 Removed verbose logging
+        // logInfo(filePath); // 🌿 Removed verbose logging
         try {
             const data = await fs.promises.readFile(filePath);
             res.set('Cache-Control', 'no-store'); // 🌿 Force fresh load
@@ -815,7 +817,7 @@ export async function createMessageServer() {
             const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'] || paramsOnConfig['token']; // Try all sources
 
             if (!token) {
-                console.error('❌ No Bot Token found for stickers!');
+                logError('❌ No Bot Token found for stickers!');
                 return res.status(500).json({ error: 'Server Config Error: No Bot Token' });
             }
 
@@ -825,12 +827,12 @@ export async function createMessageServer() {
             const data = await response.json();
 
             if (!data.ok) {
-                console.warn(`⚠️ Telegram Error for set ${setName}:`, data.description);
+                logWarn(`⚠️ Telegram Error for set ${setName}:`, data.description);
                 return res.status(400).json({ error: data.description });
             }
             res.json(data.result);
         } catch (error) {
-            console.error('Sticker Set Error:', error);
+            logError('Sticker Set Error:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -871,7 +873,7 @@ export async function createMessageServer() {
             }
 
         } catch (error) {
-            console.error('Sticker Image Error:', error);
+            logError('Sticker Image Error:', error);
             res.status(500).send();
         }
     });
@@ -884,7 +886,7 @@ export async function createMessageServer() {
 
             // 1. Check if cached file exists
             if (fs.existsSync(avatarPath)) {
-                console.log(`✅ Serving cached avatar for user ${userId}`);
+                logInfo(`✅ Serving cached avatar for user ${userId}`);
                 return res.sendFile(avatarPath);
             }
 
@@ -905,18 +907,18 @@ export async function createMessageServer() {
 
                 // If checked recently and no avatar, skip TG API call
                 if (user.avatar_cached === 0 && !cooldownPassed) {
-                    console.log(`⏰ Cooldown active for user ${userId}, skipping TG API`);
+                    logInfo(`⏰ Cooldown active for user ${userId}, skipping TG API`);
                     return res.status(404).send();
                 }
 
                 // 3. Fetch from Telegram API
-                console.log(`🔍 Fetching avatar from Telegram for user ${userId}`);
+                logInfo(`🔍 Fetching avatar from Telegram for user ${userId}`);
 
                 const paramsOnConfig = await configManager.read();
                 const token = process.env.BOT_TOKEN || paramsOnConfig['Bot Token'];
 
                 if (!token) {
-                    console.error('❌ No Bot Token found!');
+                    logError('❌ No Bot Token found!');
                     return res.status(500).send();
                 }
 
@@ -933,7 +935,7 @@ export async function createMessageServer() {
                         await pool.query(`
                             UPDATE users SET avatar_cached = 0, last_avatar_check = ? WHERE id = ?
                         `, [now, userId]);
-                        console.log(`❌ No avatar for user ${userId}, cooldown set`);
+                        logInfo(`❌ No avatar for user ${userId}, cooldown set`);
                         return res.status(404).send();
                     }
 
@@ -963,7 +965,7 @@ export async function createMessageServer() {
                     UPDATE users SET avatar_cached = 1, last_avatar_check = ? WHERE id = ?
                 `, [now, userId]);
 
-                console.log(`✅ Avatar cached for user ${userId}`);
+                logInfo(`✅ Avatar cached for user ${userId}`);
 
                 res.setHeader('Content-Type', 'image/jpeg');
                 res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -972,7 +974,7 @@ export async function createMessageServer() {
 
             res.status(404).send();
         } catch (error) {
-            console.error('Avatar fetch error:', error);
+            logError('Avatar fetch error:', error);
             res.status(404).send();
         }
     });
@@ -1000,7 +1002,7 @@ export async function createMessageServer() {
             res.json({ url: newUrl });
 
         } catch (error) {
-            console.error('Refresh URL Error:', error);
+            logError('Refresh URL Error:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -1039,13 +1041,13 @@ export async function createMessageServer() {
     /* from use https server */
     server.listen(port, () => {
         logStr = 'https://';
-        console.log(`Express server started on port ${port}`);
+        logInfo(`Express server started on port ${port}`);
     });
     /* from use https server */
 
     /* from use http server - 🌿 Enabled for Vite dev compatibility */
     app.listen(3333, () => {
-        console.log(`HTTP Express server started on port 3333`);
+        logInfo(`HTTP Express server started on port 3333`);
     });
     /* from use http server */
 
@@ -1104,7 +1106,7 @@ export async function createMessageServer() {
         const file_id = await findFileId(obj);
 
         if ((hasSticker || hasPhoto) && !obj.url_sticker && !obj.url_photo) {
-            // console.log(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
+            // logInfo(`🔍 urlReplaser: sticker=${hasSticker}, photo=${hasPhoto}, file_id=${file_id ? 'YES' : 'NO'}, token=${token ? 'YES' : 'NO'}`);
         }
 
         // Check if we have existing url_* field to refresh
@@ -1119,7 +1121,7 @@ export async function createMessageServer() {
                     const urlKey = match[0].replaceAll('"', '');
                     obj[urlKey] = newUrl;
                 } catch (e) {
-                    console.warn('Failed to refresh URL:', e.message);
+                    logWarn('Failed to refresh URL:', e.message);
                 }
             }
             return obj;
@@ -1129,7 +1131,7 @@ export async function createMessageServer() {
         if (token && file_id) {
             try {
                 const newUrl = await getFileUrl(token, file_id);
-                // console.log(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
+                // logInfo(`✅ Created URL for msg ${obj.message_id}: ${newUrl.substring(0, 50)}...`);
                 // Determine which url field to set based on message type
                 if (obj.sticker) obj.url_sticker = newUrl;
                 else if (obj.photo) obj.url_photo = newUrl;
@@ -1140,10 +1142,10 @@ export async function createMessageServer() {
                 else if (obj.animation) obj.url_animation = newUrl;
                 else if (obj.document) obj.url_document = newUrl;
             } catch (e) {
-                console.warn(`❌ Failed to create URL for msg ${obj.message_id}:`, e.message);
+                logWarn(`❌ Failed to create URL for msg ${obj.message_id}:`, e.message);
             }
         } else if (!token) {
-            console.warn('⚠️ No BOT_TOKEN found for urlReplaser');
+            logWarn('⚠️ No BOT_TOKEN found for urlReplaser');
         }
 
         return obj;

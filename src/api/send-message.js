@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import FormData from 'form-data'; // 🌿 Added for local file uploads
 import { convertVideoToNote, convertAudioToVoice } from '../services/video-processor.js'; // 🌿 Video/Audio service
 import { getPool } from '../services/db.js'; // 🌿 DB Access
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,7 +31,7 @@ async function sendMediaRequest(endpoint, payload, mediaKey, mediaUrl) {
             const localPath = path.join(appDirectory, 'public', 'uploads', filename);
 
             if (fs.existsSync(localPath)) {
-                console.log(`🌿 Found local file: ${localPath}, sending as Stream...`);
+                logInfo(`🌿 Found local file: ${localPath}, sending as Stream...`);
                 const form = new FormData();
                 form.append(mediaKey, fs.createReadStream(localPath));
 
@@ -47,10 +48,10 @@ async function sendMediaRequest(endpoint, payload, mediaKey, mediaUrl) {
                     body: form
                 });
             } else {
-                console.warn(`⚠️ Local file not found: ${localPath}, falling back to URL`);
+                logWarn(`⚠️ Local file not found: ${localPath}, falling back to URL`);
             }
         } catch (err) {
-            console.error('⚠️ Error preparing local file stream:', err);
+            logError('⚠️ Error preparing local file stream:', err);
         }
     }
 
@@ -81,9 +82,9 @@ function saveMessageLocally(data, type = 'message') {
         const fileName = `${msg.message_id}.json`;
         const filePath = path.join(folderPath, fileName);
         fs.writeFileSync(filePath, JSON.stringify(msg, null, 2));
-        console.log(`✅ ${type} saved to ${filePath}`);
+        logInfo(`✅ ${type} saved to ${filePath}`);
     } catch (saveError) {
-        console.error(`⚠️ Failed to save ${type} locally:`, saveError);
+        logError(`⚠️ Failed to save ${type} locally:`, saveError);
     }
 }
 
@@ -130,7 +131,7 @@ export async function sendMessage(req, res) {
 
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending message:', error);
+        logError('Error sending message:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -163,7 +164,7 @@ export async function sendPhoto(req, res) {
         await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending photo:', error);
+        logError('Error sending photo:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -196,7 +197,7 @@ export async function sendVideo(req, res) {
         await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending video:', error);
+        logError('Error sending video:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -228,7 +229,7 @@ export async function sendAudio(req, res) {
         await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending audio:', error);
+        logError('Error sending audio:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -259,7 +260,7 @@ export async function sendVoice(req, res) {
         await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending voice:', error);
+        logError('Error sending voice:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -297,7 +298,7 @@ export async function sendSticker(req, res) {
         await logToDB(data.result);
         res.json({ success: true, message: data.result });
     } catch (error) {
-        console.error('Error sending sticker:', error);
+        logError('Error sending sticker:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -323,11 +324,11 @@ export async function sendVideoNote(req, res) {
 
     try {
         if (!fs.existsSync(localInputPath)) {
-            console.error(`❌ Input file not found: ${localInputPath}`);
+            logError(`❌ Input file not found: ${localInputPath}`);
             throw new Error(`Input file not found: ${filename}`);
         }
 
-        console.log(`🎬 Processing Video Note: ${localInputPath}...`);
+        logInfo(`🎬 Processing Video Note: ${localInputPath}...`);
 
         // 🌿 Check file size before processing
         const stats = fs.statSync(localInputPath);
@@ -342,7 +343,7 @@ export async function sendVideoNote(req, res) {
             throw new Error('FFmpeg failed to create output file');
         }
 
-        console.log(`✅ Video Note Ready: ${localOutputPath}`);
+        logInfo(`✅ Video Note Ready: ${localOutputPath}`);
 
         // Send processed file
         const form = new FormData();
@@ -358,7 +359,7 @@ export async function sendVideoNote(req, res) {
         const data = await response.json();
 
         if (!data.ok) {
-            console.error('❌ Telegram API Error:', data);
+            logError('❌ Telegram API Error:', data);
             throw new Error(data.description || 'Telegram API rejected the video note');
         }
 
@@ -374,9 +375,9 @@ export async function sendVideoNote(req, res) {
         res.json({ success: true, message: data.result });
 
     } catch (error) {
-        console.error('❌ Error sending video note:', error.message);
-        console.error('   Input path:', localInputPath);
-        console.error('   Output path:', localOutputPath);
+        logError('❌ Error sending video note:', error.message);
+        logError('   Input path:', localInputPath);
+        logError('   Output path:', localOutputPath);
         res.status(500).json({ error: error.message });
     }
 }
@@ -404,9 +405,9 @@ export async function sendVoiceNote(req, res) {
     try {
         if (!fs.existsSync(localInputPath)) throw new Error('Input file not found');
 
-        console.log(`🎤 Processing Voice Note: ${localInputPath}...`);
+        logInfo(`🎤 Processing Voice Note: ${localInputPath}...`);
         await convertAudioToVoice(localInputPath, localOutputPath);
-        console.log(`✅ Voice Note Ready: ${localOutputPath}`);
+        logInfo(`✅ Voice Note Ready: ${localOutputPath}`);
 
         // Send processed file
         const form = new FormData();
@@ -435,7 +436,7 @@ export async function sendVoiceNote(req, res) {
         res.json({ success: true, message: data.result });
 
     } catch (error) {
-        console.error('Error sending voice note:', error);
+        logError('Error sending voice note:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -561,7 +562,7 @@ export async function setReaction(req, res) {
                     }
 
                     fs.writeFileSync(filePath, JSON.stringify(content, null, 2));
-                    console.log(`Reaction saved locally to ${filePath}`);
+                    logInfo(`Reaction saved locally to ${filePath}`);
 
                     // 🌿 Update DB with new reaction data
                     await logToDB(content);
@@ -572,7 +573,7 @@ export async function setReaction(req, res) {
             }
 
             if (!fileUpdated) {
-                console.warn(`Could not find local file for message ${message_id} to save reaction. Falling back to DB update...`);
+                logWarn(`Could not find local file for message ${message_id} to save reaction. Falling back to DB update...`);
                 try {
                     const pool = getPool();
                     if (pool) {
@@ -657,24 +658,24 @@ export async function setReaction(req, res) {
 
                             // 🌿 Update DB only
                             await logToDB(content);
-                            console.log(`✅ Reaction synced to DB fallback for message ${message_id}`);
+                            logInfo(`✅ Reaction synced to DB fallback for message ${message_id}`);
                         } else {
-                            console.error(`❌ Message ${uniqueId} not found in DB either! Cannot sync reaction.`);
+                            logError(`❌ Message ${uniqueId} not found in DB either! Cannot sync reaction.`);
                         }
                     }
                 } catch (dbFallbackErr) {
-                    console.error('DB Fallback reaction update failed:', dbFallbackErr);
+                    logError('DB Fallback reaction update failed:', dbFallbackErr);
                 }
             }
 
         } catch (localErr) {
-            console.error('Failed to save reaction locally:', localErr);
+            logError('Failed to save reaction locally:', localErr);
         }
 
         res.json({ success: true, result: true });
 
     } catch (error) {
-        console.error('Error in setReaction:', error);
+        logError('Error in setReaction:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -750,9 +751,9 @@ async function logToDB(msg) {
             mediaUrl,
             JSON.stringify(msg)
         ]);
-        // console.log(`✅ Logged ${type} ${msg.message_id} to DB`);
+        // logInfo(`✅ Logged ${type} ${msg.message_id} to DB`);
     } catch (e) {
-        console.error('DB Log Error:', e);
+        logError('DB Log Error:', e);
     }
 }
 
@@ -786,7 +787,7 @@ export async function deleteMessage(req, res) {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting message:', error);
+        logError('Error deleting message:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -839,7 +840,7 @@ export async function editMessage(req, res) {
 
         res.json({ success: true, result: data.result });
     } catch (error) {
-        console.error('Error editing message:', error);
+        logError('Error editing message:', error);
         res.status(500).json({ error: error.message });
     }
 }

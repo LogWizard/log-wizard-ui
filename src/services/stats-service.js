@@ -1,4 +1,5 @@
 import { getPool } from './db.js';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 /**
  * 🌿 Stats Service (DB Version ⚡)
@@ -127,7 +128,7 @@ export class StatsService {
                 .map(([text, weight]) => ({ text, weight }));
 
         } catch (e) {
-            console.error('Stats Generation Error:', e);
+            logError('Stats Generation Error:', e);
         }
 
         return stats;

@@ -1,6 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 export class ChatsScanner {
     constructor(msgPath) {
@@ -10,13 +11,13 @@ export class ChatsScanner {
     }
 
     async scan(forceFull = false) {
-        console.log('🌿 Starting global chats scan (Flat Structure)...');
+        logInfo('🌿 Starting global chats scan (Flat Structure)...');
         try {
             // Load cache
             if (fs.existsSync(this.cacheFile) && !forceFull) {
                 try {
                     this.chats = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8'));
-                } catch (e) { console.error('Cache load error:', e); }
+                } catch (e) { logError('Cache load error:', e); }
             }
 
             if (!fs.existsSync(this.msgPath)) {
@@ -89,16 +90,16 @@ export class ChatsScanner {
                         // Ignore corrupted files
                     }
                 }
-                // console.log(`  Scanned ${date} (${files.length} files)`);
+                // logInfo(`  Scanned ${date} (${files.length} files)`);
             }
 
             // Save cache
             fs.writeFileSync(this.cacheFile, JSON.stringify(this.chats, null, 2));
-            console.log(`✅ Scan complete. Found ${Object.keys(this.chats).length} chats.`);
+            logInfo(`✅ Scan complete. Found ${Object.keys(this.chats).length} chats.`);
             return this.chats;
 
         } catch (err) {
-            console.error('Scan error:', err);
+            logError('Scan error:', err);
             return this.chats;
         }
     }

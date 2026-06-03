@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,7 @@ const storage = multer.diskStorage({
 
 // File filter - whitelist allowed types
 const fileFilter = (req, file, cb) => {
-    console.log('📂 Upload request:', file.originalname, 'MIME:', file.mimetype);
+    logInfo('📂 Upload request:', file.originalname, 'MIME:', file.mimetype);
 
     const allowedTypes = [
         'image/jpeg',
@@ -52,7 +53,7 @@ const fileFilter = (req, file, cb) => {
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        console.warn('⚠️ Unknown MIME type uploaded:', file.mimetype, 'Allowing for debug...');
+        logWarn('⚠️ Unknown MIME type uploaded:', file.mimetype, 'Allowing for debug...');
         cb(null, true); // 🌿 ALLOW EVERYTHING FOR DEBUGGING
         // cb(new Error('Invalid file type. Allowed: images, videos, audio'), false);
     }

@@ -2,6 +2,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import path from 'path';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -21,7 +22,7 @@ export function convertVideoToNote(inputPath, outputPath) {
         // 🌿 First, probe the file to check streams
         ffmpeg.ffprobe(inputPath, (probeErr, metadata) => {
             if (probeErr) {
-                console.error('❌ FFprobe error:', probeErr.message);
+                logError('❌ FFprobe error:', probeErr.message);
                 return reject(new Error(`Cannot analyze file: ${probeErr.message}`));
             }
 
@@ -30,11 +31,11 @@ export function convertVideoToNote(inputPath, outputPath) {
             const hasAudio = metadata?.streams?.some(s => s.codec_type === 'audio');
 
             if (!hasVideo) {
-                console.error('❌ No video stream found in file. This appears to be audio-only.');
+                logError('❌ No video stream found in file. This appears to be audio-only.');
                 return reject(new Error('Recording has no video stream. Please record with camera enabled.'));
             }
 
-            console.log(`🎬 Streams detected: video=${hasVideo}, audio=${hasAudio}`);
+            logInfo(`🎬 Streams detected: video=${hasVideo}, audio=${hasAudio}`);
 
             // Build FFmpeg command using proper methods (not raw options for filters)
             const command = ffmpeg(inputPath);
@@ -66,7 +67,7 @@ export function convertVideoToNote(inputPath, outputPath) {
                 command.audioCodec('aac')
                     .audioBitrate('128k');
             } else {
-                console.log('⚠️ No audio stream, encoding video-only');
+                logInfo('⚠️ No audio stream, encoding video-only');
                 command.noAudio();
             }
 
@@ -82,7 +83,7 @@ export function convertVideoToNote(inputPath, outputPath) {
                     resolve(outputPath);
                 })
                 .on('error', (err, stdout, stderr) => {
-                    console.error('❌ FFmpeg FAILED:', err.message);
+                    logError('❌ FFmpeg FAILED:', err.message);
                     reject(err);
                 });
         });
@@ -106,11 +107,11 @@ export function convertAudioToVoice(inputPath, outputPath) {
             ])
             .save(outputPath)
             .on('end', () => {
-                console.log('✅ Voice Note processed:', outputPath);
+                logInfo('✅ Voice Note processed:', outputPath);
                 resolve(outputPath);
             })
             .on('error', (err) => {
-                console.error('❌ Voice Note processing error:', err);
+                logError('❌ Voice Note processing error:', err);
                 reject(err);
             });
     });

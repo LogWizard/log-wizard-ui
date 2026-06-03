@@ -3,6 +3,7 @@ import path from 'path';
 import fetch from 'node-fetch';
 import { getPool } from './db.js';
 import { ConfigManager } from '../config-manager.js';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 /**
  * 🌿 Avatar Service
@@ -20,7 +21,7 @@ export class AvatarService {
         if (this.isRunning) return;
         this.isRunning = true;
         this.processQueue();
-        console.log('👤 Avatar Service started.');
+        logInfo('👤 Avatar Service started.');
     }
 
     addToQueue(userId) {
@@ -54,7 +55,7 @@ export class AvatarService {
             }
 
         } catch (e) {
-            console.error('AvatarService Error:', e);
+            logError('AvatarService Error:', e);
         } finally {
             // Check again in 5 seconds
             setTimeout(() => this.processQueue(), 5000);
@@ -102,7 +103,7 @@ export class AvatarService {
 
                     // Update DB with SUCCESS
                     await pool.query('UPDATE users SET photo_url = ? WHERE id = ?', [relativePath, userId]);
-                    // console.log(`👤 Fetched avatar for ${userId}`);
+                    // logInfo(`👤 Fetched avatar for ${userId}`);
                 }
             } else {
                 // No photo, mark as 'none' to stop retrying
@@ -110,7 +111,7 @@ export class AvatarService {
             }
 
         } catch (e) {
-            console.warn(`Failed to fetch avatar for ${userId}:`, e.message);
+            logWarn(`Failed to fetch avatar for ${userId}:`, e.message);
         }
     }
 }

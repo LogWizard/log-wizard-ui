@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs'; // 🌿 Async FS
 import path from 'path';
 import { getPool } from './db.js';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 export class MessageSyncer {
     constructor(basePath) {
@@ -14,7 +15,7 @@ export class MessageSyncer {
         if (this.isRunning) return;
         this.isRunning = true;
         console.time('Sync');
-        console.log('🔄 Starting Message Sync (Async & Non-Blocking)...');
+        logInfo('🔄 Starting Message Sync (Async & Non-Blocking)...');
 
         try {
             const pool = getPool();
@@ -22,11 +23,11 @@ export class MessageSyncer {
 
             await this.scanDirectory(this.basePath);
         } catch (e) {
-            console.error('❌ Sync Error:', e);
+            logError('❌ Sync Error:', e);
         } finally {
             this.isRunning = false;
             console.timeEnd('Sync');
-            console.log(`✅ Sync Complete. Processed ${this.processedFiles} files.`);
+            logInfo(`✅ Sync Complete. Processed ${this.processedFiles} files.`);
         }
     }
 
@@ -66,10 +67,10 @@ export class MessageSyncer {
             this.processedFiles++;
 
             if (this.processedFiles % 2000 === 0) {
-                console.log(`🔄 Synced ${this.processedFiles} messages...`);
+                logInfo(`🔄 Synced ${this.processedFiles} messages...`);
             }
         } catch (e) {
-            // console.warn(`Skipping corrupted file: ${filePath}`);
+            // logWarn(`Skipping corrupted file: ${filePath}`);
         }
     }
 

@@ -3,6 +3,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +60,7 @@ export async function setManualMode(req, res) {
     config[String(chat_id)] = Boolean(enabled);
     await saveConfig(config);
 
-    console.log(`🔀 Manual mode for ${chat_id}: ${enabled ? 'ON' : 'OFF'}`);
+    logInfo(`🔀 Manual mode for ${chat_id}: ${enabled ? 'ON' : 'OFF'}`);
 
     res.json({
         success: true,
